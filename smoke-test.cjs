@@ -7,6 +7,9 @@ const css=fs.readFileSync("style.css","utf8");
 assert.match(css,/BAZOO identity ribbon/,"connected white logo ribbon is missing");
 assert.match(css,/border-radius:16px 0 0 16px!important/,"ribbon must open flush against page edge");
 assert.match(css,/margin-inline-start:-13px!important/,"mobile ribbon must reach screen edge");
+assert.match(css,/height:106px!important/,"desktop logo strip must match full logo proportions");
+assert.match(css,/height:71px!important/,"mobile logo strip must fill logo height");
+assert.match(css,/padding:0!important/,"brand strip should have zero inner spacing");
 assert.match(css,/background:#fff!important/,"logo ribbon should be white");
 assert.match(css,/\.header \.brand img\s*\{[\s\S]*?object-fit:contain!important/,"horizontal logo should remain fully visible");
 const nodes=new Map(), handlers=new Map(), data=new Map();
@@ -57,7 +60,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/ribbon12/,"asset cache bust missing");
+ assert.match(html,/ribbon13/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
