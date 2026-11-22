@@ -1,25 +1,83 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#24154d">
-<title>إدارة BAZOO | بازو</title>
-<meta name="description" content="لوحة إدارة متجر بازو">
-<link rel="stylesheet" href="./admin-panel.css?v=20261122formfix02">
-<link rel="icon" href="./%D8%B4%D8%B9%D8%A7%D8%B1%20%D8%A8%D8%A7%D8%B2%D9%88.png"></head>
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#32136f">
+ <meta name="description" content="لوحة إدارة BAZOO — نظام إدارة المتجر الإلكتروني">
+ <title>إدارة المتجر | BAZOO بازو</title>
+ <link rel="icon" type="image/png" href="./%D8%B4%D8%B9%D8%A7%D8%B1%20%D8%A8%D8%A7%D8%B2%D9%88.png">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link rel="stylesheet" href="./admin-panel.css?v=20261122brand31">
+</head>
 <body>
-<div class="layout">
- <aside class="sidebar">
-  <a class="brand" href="./index.html#/home"><span class="brand-symbol">B</span><span><strong>BAZOO</strong><small>نظام إدارة المتجر</small></span></a>
-  <div class="sidebar-title">لوحة التحكم</div>
+<div class="mobile-backdrop" id="sidebarBackdrop" hidden></div>
+<div class="layout" id="adminLayout">
+ <aside class="sidebar" id="adminSidebar" aria-label="القائمة الجانبية">
+  <div class="sidebar-brand">
+   <a class="brand" href="./index.html#/home" aria-label="BAZOO — العودة إلى المتجر">
+    <img src="./%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png" alt="شعار BAZOO الأصلي" width="186" height="79">
+   </a>
+   <div class="brand-caption"><span class="brand-caption-dot"></span><span>مركز إدارة المتجر</span><span class="brand-caption-version">PRO</span></div>
+  </div>
+  <div class="sidebar-label">مساحة العمل <span>WORKSPACE</span></div>
   <nav id="nav" aria-label="أقسام الإدارة"></nav>
-  <div class="sidebar-foot"><span id="userLabel">التحقق من الحساب...</span><button class="text-button" id="signOut" type="button" hidden>تسجيل الخروج</button><a href="./index.html#/home">العودة إلى المتجر</a></div>
+  <div class="sidebar-extra">
+   <div class="sidebar-store">
+    <span class="sidebar-store-icon"><svg class="ui-icon"><use href="./icons.svg#shopping-bag"></use></svg></span>
+    <strong>متجرك تحت السيطرة</strong>
+    <small>إدارة المنتجات والطلبات في مكان واحد</small>
+    <a href="./index.html#/home" target="_blank" rel="noopener">زيارة المتجر <svg class="ui-icon"><use href="./icons.svg#arrow-left"></use></svg></a>
+   </div>
+  </div>
+  <div class="sidebar-foot">
+   <span class="user-avatar"><svg class="ui-icon"><use href="./icons.svg#user-round"></use></svg></span>
+   <div class="sidebar-user"><strong id="roleLabel">مسؤول المتجر</strong><small id="userLabel">جارٍ التحقق من الحساب...</small></div>
+   <button type="button" class="sidebar-logout" id="signOut" title="تسجيل الخروج" aria-label="تسجيل الخروج" hidden><svg class="ui-icon"><use href="./icons.svg#log-out"></use></svg></button>
+  </div>
  </aside>
  <main class="main">
-  <header class="topbar"><div><p class="eyebrow">إدارة المتجر الإلكتروني</p><h1 id="pageTitle">لوحة إدارة بازو</h1></div><div class="top-actions"><span class="secure-label">اتصال محمي بقاعدة البيانات</span><button id="refresh" class="button secondary" type="button">تحديث البيانات</button></div></header>
-  <div id="alert" class="alert" role="alert" aria-live="assertive" hidden></div>
-  <div id="content"><section class="empty-state">جارٍ التحقق من بيانات حساب الإدارة...</section></div>
+  <header class="topbar">
+   <div class="topbar-start">
+    <button id="menuToggle" type="button" class="icon-button mobile-toggle" aria-label="فتح القائمة" aria-controls="adminSidebar" aria-expanded="false"><svg class="ui-icon"><use href="./icons.svg#menu"></use></svg></button>
+    <div class="breadcrumb"><span>BAZOO</span><svg class="ui-icon"><use href="./icons.svg#chevron-left"></use></svg><strong id="breadcrumbCurrent">لوحة التحكم</strong></div>
+   </div>
+   <div class="top-actions">
+    <span class="secure-label"><span class="live-dot"></span> متصل بقاعدة البيانات</span>
+    <a class="button secondary visit-store" href="./index.html#/home" target="_blank" rel="noopener"><svg class="ui-icon"><use href="./icons.svg#arrow-up-right"></use></svg><span>عرض المتجر</span></a>
+    <button class="button secondary refresh-button" id="refresh" type="button"><svg class="ui-icon"><use href="./icons.svg#refresh"></use></svg><span>تحديث البيانات</span></button>
+   </div>
+  </header>
+  <div class="main-content">
+   <section class="page-intro" id="pageIntro">
+    <div class="page-intro-copy">
+     <div class="eyebrow"><span class="eyebrow-mark"></span> BAZOO ADMIN <span class="eyebrow-sep"></span> إدارة المتجر</div>
+     <h1 id="pageTitle">لوحة التحكم</h1>
+     <p id="pageSubtitle">كل أدوات إدارة بازو في مساحة عمل واحدة.</p>
+    </div>
+    <div class="page-intro-symbol" aria-hidden="true"><svg class="ui-icon"><use href="./icons.svg#sparkles"></use></svg></div>
+   </section>
+   <div id="alert" class="alert" role="alert" aria-live="assertive" hidden></div>
+   <div id="content"><section class="empty-state">جارٍ التحقق من حساب الإدارة وتحميل البيانات...</section></div>
+   <footer class="admin-footnote"><span>© BAZOO — نظام إدارة بازو</span><span>مصمم لهوية المتجر <span class="footnote-heart">✦</span></span></footer>
+  </div>
  </main>
 </div>
-<div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle"><div class="dialog-header"><h2 id="dialogTitle"></h2><button class="close-button" id="closeDialog" type="button" aria-label="إغلاق النافذة">×</button></div><div id="dialogBody"></div></section></div>
-<script type="module" src="./admin-panel.js?v=20261122formfix02"></script>
-</body></html>
+<div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+<div id="overlay" class="overlay" hidden>
+ <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" tabindex="-1">
+  <div class="dialog-header">
+   <div class="dialog-heading">
+    <span class="dialog-icon" id="dialogIcon"><svg class="ui-icon"><use href="./icons.svg#settings"></use></svg></span>
+    <div><span class="dialog-eyebrow" id="dialogEyebrow">BAZOO · الإدارة</span><h2 id="dialogTitle">إضافة عنصر</h2></div>
+   </div>
+   <button class="close-button" id="closeDialog" type="button" aria-label="إغلاق النافذة" title="إغلاق النافذة"><svg class="ui-icon"><use href="./icons.svg#x"></use></svg></button>
+  </div>
+  <div class="dialog-body" id="dialogBody"></div>
+  <div class="dialog-bottom"><svg class="ui-icon"><use href="./icons.svg#shield-check"></use></svg><span>تُحفظ التغييرات بأمان بعد التحقق منها في قاعدة البيانات</span><span>BAZOO</span></div>
+ </section>
+</div>
+<script type="module" src="./admin-panel.js?v=20261122brand31"></script>
+</body>
+</html>
