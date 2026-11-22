@@ -1,4 +1,4 @@
-/* BAZOO shop • offline-hosted JavaScript core • no third-party CDN */
+/* BAZOO public storefront bundle */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -31,7 +31,7 @@ function createClient(baseUrl, publishableKey) {
   const rawFetch=async(path,options={},authorize=true)=>{
     const headers=new Headers(options.headers||{});
     headers.set("apikey",publishableKey);
-    if(!headers.has("Content-Type") && !(options.body instanceof Blob) && !(options.body instanceof FormData))headers.set("Content-Type","application/json");
+    if(!headers.has("Content-Type") && !(typeof Blob!=="undefined" && options.body instanceof Blob) && !(typeof FormData!=="undefined" && options.body instanceof FormData))headers.set("Content-Type","application/json");
     if(authorize){const token=await getToken();if(token)headers.set("Authorization","Bearer "+token)}
     const ctrl=new AbortController();
     const timeout=setTimeout(()=>ctrl.abort(),10000);
@@ -284,7 +284,12 @@ function validateSiteForm(form){
 function go(route){location.hash="#/"+route;if(location.hash==="#/"+route)render()}
 function catName(id){return state.categories.find(x=>x.id===id)?.name||"منتج"}
 function brandName(id){return state.brands.find(x=>x.id===id)?.name||""}
-const activeProducts=()=>state.products.filter(p=>p.active);
+const activeProducts=()=>state.products.filter(p=>{
+ if(!p.active)return false;
+ const c=state.categories.find(x=>x.id===p.category_id),b=state.brands.find(x=>x.id===p.brand_id);
+ const parent=c?.parent_id?state.categories.find(x=>x.id===c.parent_id):null;
+ return (!c||c.active)&&(!parent||parent.active)&&(!b||b.active);
+});
 function filterProducts({category=state.category,brand=state.brand,q=state.q,onSale=false}={}){
  const descendants=category?state.categories.filter(c=>String(c.parent_id)===String(category)).map(c=>c.id):[];
  return activeProducts().filter(p=>{
