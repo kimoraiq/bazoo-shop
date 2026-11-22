@@ -456,22 +456,25 @@ async function onSubmit(event){
  const form=event.target;
  if(!form?.matches||!form.matches("form"))return;
  event.preventDefault();event.stopPropagation();
+ // HTMLFormElement controls with name="id" can shadow form.id in browsers.
+ // Read the actual form attribute, never its named property.
+ const formType=form.getAttribute("id")||"";
  if(form.dataset.pending==="true")return;
  const button=form.querySelector('[type="submit"]');
  if(button)button.disabled=true;form.dataset.pending="true";
  clearAlert();
  try{
   let result="";
-  if(form.id==="loginForm"){
+  if(formType==="loginForm"){
    const data=new FormData(form),auth=await db.auth.signInWithPassword({email:String(data.get("email")||"").trim(),password:String(data.get("password")||"")});
    if(auth.error)throw Error(auth.error.message);
    await authenticate();alertUser("تم تسجيل الدخول والتحقق من الصلاحيات.","success");
   }else{
    if(!state.adminVerified)throw Error("انتهت صلاحيات الجلسة، سجّل الدخول مرة أخرى.");
-   if(form.id==="productForm")result=await saveProduct(form);
-   else if(form.id==="taxonomyForm")result=await saveTaxonomy(form);
-   else if(form.id==="promoForm")result=await savePromo(form);
-   else if(form.id==="memberForm")result=await saveMember(form);
+   if(formType==="productForm")result=await saveProduct(form);
+   else if(formType==="taxonomyForm")result=await saveTaxonomy(form);
+   else if(formType==="promoForm")result=await savePromo(form);
+   else if(formType==="memberForm")result=await saveMember(form);
    else if(form.matches(".shipping-row"))result=await saveShipping(form);
    else throw Error("النموذج غير معروف");
    clearDraft();closeDialog();alertUser(result,"success");await reload();
