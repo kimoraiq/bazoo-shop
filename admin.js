@@ -343,7 +343,7 @@ if(state.adminTab==="categories"||state.adminTab==="brands"){
 }
 if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" style="margin-bottom:16px"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#plus"></use></svg> إعلان جديد</button><div class="card admin-table"><table><thead><tr><th>الإعلان</th><th>المكان</th><th>الحالة</th><th>تعديل</th></tr></thead><tbody>'+(state.promos.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(p.placement)+'</td><td>'+(p.active?"نشط":"مخفي")+'</td><td><button data-edit-promo="'+p.id+'">تعديل</button><button data-toggle-promo="'+p.id+'">'+(p.active?"إخفاء":"نشر")+'</button><button class="danger-action" data-delete-promo="'+p.id+'">حذف</button></td></tr>').join("")||'<tr><td colspan="4">لا توجد إعلانات</td></tr>')+'</tbody></table></div>';
 if(state.lastAdminSave&&state.adminTab==="products")body='<div class="admin-save-confirmation" role="status">'+esc(state.lastAdminSave)+' <button type="button" data-dismiss-admin-notice aria-label="إغلاق التنبيه">×</button></div>'+body;
-return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
+return '<div class="page"><div id="adminSaveFeedback" role="status" aria-live="polite" class="admin-save-confirmation" '+(state.adminFeedback?"":"hidden")+' >'+esc(state.adminFeedback||"")+'</div><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
 
 async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
@@ -528,7 +528,23 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
  });
 }
 document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {data,error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status).select("id,status").single();notify(error||!data?(error?.message||"لم يتم تعديل حالة الطلب. يرجى التحقق من الصلاحيات."):"تم تحديث حالة الطلب.")});
-document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();if(error||!data)return notify(error?.message||"لم تتأكد عملية الحفظ. يرجى التحقق من الصلاحيات.");await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
+document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{
+ const g=el.dataset.rate;
+ const price=Number(document.getElementById("rate-"+g).value);
+ const enabled=document.getElementById("enabled-"+g).checked;
+ if(!Number.isSafeInteger(price)||price<0)return notify("أدخل سعر توصيل صحيحاً.");
+ if(el.disabled)return;
+ el.disabled=true;
+ try{
+  const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();
+  if(error||!data)throw Error(error?.message||"لم تؤكد قاعدة البيانات التعديل.");
+  await verifySaved("shipping_rates","governorate",g,{price_iqd:price,enabled});
+  await loadCatalog();
+  notify("تم حفظ أجور التوصيل لمحافظة "+g+" والتحقق منها.");
+  await render();
+ }catch(err){notify("تعذّر حفظ التوصيل لمحافظة "+g+": "+err.message)}
+ finally{el.disabled=false}
+});
 }
 function setProductSaveStatus(form,message,type="error"){
  const box=form?.querySelector?.("#productSaveStatus");
@@ -565,6 +581,7 @@ async function saveDiscountOnly(form){
   if(error||!data)throw Error(error?.message||"لم يُحفظ التعديل في قاعدة البيانات.");
   await verifySaved("products","id",id,{price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,on_sale:priceInfo.percentage>0||promotion});
   await loadCatalog();
+  clearDraft(form);
   setProductSaveStatus(form,"تم حفظ السعر والخصم بنجاح.", "success");
   state.editProduct=id;
  }catch(err){setProductSaveStatus(form,"تعذّر حفظ الخصم: "+err.message);}
