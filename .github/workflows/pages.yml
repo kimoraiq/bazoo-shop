@@ -30,6 +30,7 @@ jobs:
           node discount-test.cjs
           node media-upload-test.cjs
           node localization-scroll-test.cjs
+          node product-save-test.cjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
