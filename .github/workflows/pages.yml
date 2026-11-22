@@ -25,6 +25,7 @@ jobs:
           node --check admin.js
           node --check client.js
           node --check bundle.js
+          node smoke-test.cjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
