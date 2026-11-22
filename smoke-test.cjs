@@ -20,7 +20,12 @@ assert.match(css,/\.header \.search button\{[\s\S]*?background:#5822af!important
 assert.match(css,/BAZOO mobile bottom dock/,"branded bottom navigation is missing");
 assert.match(css,/\.bottomnav\{[\s\S]*?background:linear-gradient\(115deg,#51209e/,"bottom dock should be purple");
 assert.match(css,/\.bottomnav button.active::before\{[\s\S]*?background:#ff9b53/,"active page should have orange indicator");
+assert.match(html,/class="delivery-desktop">إلى جميع أنحاء العراق/,"desktop delivery caption must read naturally");
 assert.match(html,/class="delivery-mobile">لكل العراق/,"mobile delivery copy missing");
+assert.match(css,/Explicit delivery visibility across breakpoints/,"delivery responsive caption guard missing");
+assert.match(css,/\.header \.delivery-note \.delivery-desktop\{display:block!important\}/,"desktop delivery visible");
+assert.match(css,/\.header \.delivery-note \.delivery-mobile\{display:none!important\}/,"mobile delivery hidden on desktop");
+assert.match(css,/@media\(max-width:600px\)\{\s*\.header \.delivery-note \.delivery-desktop\{display:none!important\}\s*\.header \.delivery-note \.delivery-mobile\{display:block!important\}/,"desktop delivery hidden on mobile");
 assert.match(css,/BAZOO purple category navigation/,"purple nav styling missing");
 assert.match(css,/\.category-topbar\{\s*background:#5822af!important/,"category nav should use BAZOO purple");
 assert.match(css,/\.category-nav-link \.svg-icon\{color:#fff!important/,"category icons should be white");
@@ -72,7 +77,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/mobileheader17/,"asset cache bust missing");
+ assert.match(html,/delivery18/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
