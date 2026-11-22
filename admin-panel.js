@@ -5,26 +5,46 @@ const byId=id=>document.getElementById(id);
 const html=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=n=>new Intl.NumberFormat("en-US").format(Number(n)||0)+" د.ع";
 const safeUrl=url=>/^https:\/\//i.test(String(url||""))?html(url):"";
-const SCOPE={products:"المنتجات",orders:"الطلبات",shipping:"التوصيل",promos:"الإعلانات",categories:"الفئات",brands:"العلامات التجارية",members:"المسؤولون"};
-const ICON={products:"▦",orders:"▤",shipping:"▣",promos:"✦",categories:"▧",brands:"◈",members:"♙"};
+const SCOPE={overview:"لوحة التحكم",products:"المنتجات",orders:"الطلبات",shipping:"التوصيل",promos:"الإعلانات",categories:"الفئات",brands:"العلامات التجارية",members:"المسؤولون"};
+const ICON={overview:"home",products:"package",orders:"clipboard",shipping:"truck",promos:"sparkles",categories:"grid",brands:"tag",members:"user-round"};
 const STATUS={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
 const state={user:null,role:null,permissions:{},tab:"products",records:{},busy:false,loading:false,adminVerified:false,draftKey:""};
 let bootPromise=null;
+function glyph(name,cls="ui-icon"){return '<svg class="'+cls+'" aria-hidden="true"><use href="./icons.svg#'+name+'"></use></svg>'}
+const ICON_ACTION={edit:"settings",new:"plus",toggle:"eye",delete:"x",close:"x"};
+const SUBTITLE={overview:"تابع أداء المتجر، واختصر وقت الإدارة من مساحة عمل واحدة.",products:"كل منتجات بازو وأسعارها ومخزونها في مكان واحد.",orders:"تابع كل طلب وغيّر حالة الطلب أو المنتج بسهولة.",shipping:"تحكّم في أجور التوصيل وتوفّر الخدمة لكل محافظة.",promos:"أنشئ لافتات جذابة ووحّد تجربة التسوّق.",categories:"رتّب أقسام المتجر وخصّص تجربة تصفّح المنتجات.",brands:"نظّم العلامات التجارية المتاحة في بازو.",members:"امنح فريقك الصلاحيات اللازمة بدون تعريض بيانات المتجر للخطر."};
 function alertUser(message,type="error"){
- const node=byId("alert");node.textContent=String(message);node.className="alert "+type;node.hidden=false;
- node.scrollIntoView({block:"nearest",behavior:"smooth"});
+ const node=byId("alert");
+ node.textContent=String(message);node.className="alert "+type;node.hidden=false;
+ if(typeof node.scrollIntoView==="function")node.scrollIntoView({block:"nearest",behavior:"smooth"});
+ const stack=byId("toastStack");
+ if(stack&&typeof stack.appendChild==="function"){
+  const toast=document.createElement("div");
+  toast.className="toast-item "+type;
+  toast.innerHTML='<span class="toast-symbol">'+glyph(type==="success"?"check-circle":"circle-alert")+'</span><span>'+html(message)+'</span><button class="toast-close" type="button" aria-label="إغلاق التنبيه">×</button>';
+  toast.querySelector("button").onclick=()=>toast.remove();
+  stack.appendChild(toast);
+  setTimeout(()=>{if(toast.isConnected){toast.classList.add("is-leaving");setTimeout(()=>toast.remove(),280)}},5100);
+  if(stack.children.length>4)stack.firstElementChild?.remove();
+ }
 }
 function clearAlert(){byId("alert").hidden=true}
-function can(scope){return !!state.user&&(state.role==="owner"||state.role==="full"||state.permissions[scope]===true)}
+function can(scope){return !!state.user&&(scope==="overview"||state.role==="owner"||state.role==="full"||state.permissions[scope]===true)}
 function tabKeys(){return Object.keys(SCOPE).filter(key=>key==="members"?state.role==="owner":can(key))}
 function renderNav(){
- const nav=byId("nav");const tabs=tabKeys();
- if(!tabs.includes(state.tab))state.tab=tabs[0]||"products";
- nav.innerHTML=tabs.map(key=>'<button type="button" class="nav-button '+(state.tab===key?"active":"")+'" data-tab="'+key+'"><span class="nav-icon">'+ICON[key]+'</span>'+SCOPE[key]+'</button>').join("");
+ const nav=byId("nav"),tabs=tabKeys();
+ if(!tabs.includes(state.tab))state.tab=tabs[0]||"overview";
+ nav.innerHTML=tabs.map(key=>'<button type="button" class="nav-button '+(state.tab===key?"active":"")+'" data-tab="'+key+'" '+(state.tab===key?'aria-current="page"':'')+'><span class="nav-icon">'+glyph(ICON[key])+'</span><span>'+SCOPE[key]+'</span></button>').join("");
  byId("userLabel").textContent=state.user?.email||"غير مسجّل";
  byId("signOut").hidden=!state.user;
+ if(byId("roleLabel"))byId("roleLabel").textContent=state.role==="owner"?"المالك الرئيسي":state.role==="full"?"مسؤول كامل الصلاحيات":state.role==="limited"?"مسؤول المتجر":"حساب الإدارة";
 }
-function title(text){byId("pageTitle").textContent=text}
+function title(text){
+ byId("pageTitle").textContent=text;
+ if(byId("breadcrumbCurrent"))byId("breadcrumbCurrent").textContent=text;
+ if(byId("pageSubtitle"))byId("pageSubtitle").textContent=SUBTITLE[state.tab]||"مساحة عمل متكاملة لإدارة متجر بازو.";
+ document.title=text+" | BAZOO بازو";
+}
 function field(label,name,value="",attrs="",extra=""){
  return '<label class="field">'+html(label)+'<input class="input" name="'+name+'" value="'+html(value)+'" '+attrs+'>'+extra+'</label>';
 }
@@ -33,12 +53,19 @@ function selectField(label,name,opts,current,attrs=""){
 }
 function textField(label,name,value="",rows=3){return '<label class="field full">'+html(label)+'<textarea class="input" name="'+name+'" rows="'+rows+'">'+html(value)+'</textarea></label>'}
 function formFooter(label="حفظ التعديلات"){
- return '<div class="form-actions full"><button type="submit" class="button">'+label+'</button><button type="button" class="button secondary" data-action="close">إلغاء</button></div>';
+ return '<div class="form-actions full"><button type="submit" class="button">'+glyph("check-circle")+label+'</button><button type="button" class="button secondary" data-action="close">إلغاء</button></div>';
 }
+function sectionHeading(heading,note="",symbol="settings"){return '<div class="form-section-title">'+glyph(symbol)+'<span>'+html(heading)+'</span>'+(note?'<small>'+html(note)+'</small>':'')+'</div>'}
 function booleanSelect(label,name,value=true){return selectField(label,name,[["true","نعم"],["false","لا"]],Boolean(value)?"true":"false")}
 function makeForm(id,contents){return '<form id="'+id+'" class="form-grid" novalidate>'+contents+'</form>'}
 function openDialog(heading,body,draftId=null){
- byId("dialogTitle").textContent=heading;byId("dialogBody").innerHTML=body;
+ byId("dialogTitle").textContent=heading;
+ byId("dialogBody").innerHTML=body;
+ const isDelete=heading.includes("حذف")||heading.includes("تأكيد");
+ if(byId("overlay").dataset)byId("overlay").dataset.variant=isDelete?"danger":"default";
+ const iconName=isDelete?"circle-alert":heading.includes("منتج")?"package":heading.includes("إعلان")?"sparkles":heading.includes("مسؤول")?"user-plus":heading.includes("فئة")?"grid":"settings";
+ if(byId("dialogIcon"))byId("dialogIcon").innerHTML=glyph(iconName);
+ if(byId("dialogEyebrow"))byId("dialogEyebrow").textContent=isDelete?"تأكيد إجراء إداري":"BAZOO • إدارة المتجر";
  byId("overlay").hidden=false;
  document.body.style.overflow="hidden";
  state.draftKey=draftId&&state.user?"bazoo-manage-draft:"+state.user.id+":"+draftId:"";
@@ -111,7 +138,7 @@ async function reload(){
  }catch(err){alertUser(err.message);byId("content").innerHTML='<section class="empty-state">'+html(err.message)+'</section>';}
  finally{state.loading=false;byId("refresh").disabled=false}
 }
-function action(kind,table,id,label,cls="secondary"){return '<button type="button" class="button mini '+cls+'" data-action="'+kind+'" data-table="'+table+'" data-id="'+html(id)+'">'+label+'</button>'}
+function action(kind,table,id,label,cls="secondary"){return '<button type="button" class="button mini '+cls+'" data-action="'+kind+'" data-table="'+table+'" data-id="'+html(id)+'">'+glyph(ICON_ACTION[kind]||"settings")+label+'</button>'}
 function imageCell(url){return url&&safeUrl(url)?'<img class="image-thumb" src="'+safeUrl(url)+'" alt="صورة المنتج" loading="lazy">':'—'}
 function productRows(){
  return (state.records.products||[]).map(p=>'<tr><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
