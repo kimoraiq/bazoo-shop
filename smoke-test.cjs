@@ -77,7 +77,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/delivery18/,"asset cache bust missing");
+ assert.match(html,/staff19/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
@@ -87,6 +87,12 @@ const context={
  assert.match(source,/artworkOnly/,"finished banner artwork display missing");
  assert.match(source,/function cropBanner\(/,"admin image preparation missing");
  assert.match(source,/name="photos"/,"multiple admin photos upload missing");
+ assert.match(source,/function canAccess\(scope\)/,"permission-aware admin navigation missing");
+ assert.match(source,/function membersPage\(/,"staff management page missing");
+ assert.match(source,/admin_grant_member/,"owner-only staff grant RPC missing");
+ assert.match(source,/admin_revoke_member/,"owner-only staff removal RPC missing");
+ assert.match(source,/function saveMember\(/,"staff form save handler missing");
+ assert.match(css,/BAZOO staff control center/,"staff permissions design missing");
  assert.match(source,/function confirmAction\(/,"branded confirmation dialog missing");
  assert.match(source,/function removeRecord\(/,"admin product and promo deletion missing");
  assert.match(source,/demo-price-note/,"demo price labels missing");
