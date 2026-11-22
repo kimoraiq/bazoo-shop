@@ -1835,3 +1835,7 @@ html{scroll-behavior:smooth}
  .customer-order-total{border-top:1px solid #e8dfef;padding-top:12px;display:flex;align-items:center;justify-content:space-between}
  .customer-order-total strong{font-size:20px}
 }
+
+/* BAZOO durable admin save feedback */
+.admin-save-failure{border:1px solid #e9a7ad!important;background:#fff1f2!important;color:#92212a!important;padding:12px 16px;border-radius:12px;margin-bottom:16px}
+#adminSaveFeedback[hidden]{display:none!important}
