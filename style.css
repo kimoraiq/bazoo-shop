@@ -1531,3 +1531,23 @@ html{scroll-behavior:smooth}
  .product-save-actions{flex-direction:column;align-items:stretch}
  .product-save-actions .btn{width:100%}
 }
+
+
+/* BAZOO authenticated administrator access and session diagnostics */
+.admin-access-notice{
+ max-width:760px;
+ margin:35px auto;
+ text-align:center;
+ padding:25px 20px;
+ line-height:1.9;
+}
+.admin-access-notice h2{color:#5f2b9d;margin:0 0 14px}
+.admin-access-notice p{color:#746182;line-height:1.9;overflow-wrap:anywhere}
+.admin-access-notice strong{color:#38224d}
+.admin-access-actions{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:18px auto 2px}
+.admin-access-actions>.btn{min-height:45px}
+@media(max-width:600px){
+ .admin-access-notice{padding:18px 12px;margin:16px auto}
+ .admin-access-actions{flex-direction:column}
+ .admin-access-actions>.btn{width:100%}
+}
