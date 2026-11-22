@@ -33,6 +33,7 @@ jobs:
           node product-save-test.cjs
           node admin-controls-test.cjs
           node admin-auth-test.cjs
+          node auth-refresh-concurrency-test.cjs
           node admin-persistence-test.cjs
           node order-workflow-test.cjs
       - name: Configure Pages
