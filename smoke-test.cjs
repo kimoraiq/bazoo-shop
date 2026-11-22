@@ -51,7 +51,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/category-thumb/,"real photo category thumbnails missing");
- assert.match(html,/bazoo7/,"asset cache bust missing");
+ assert.match(html,/bazoo8/,"asset cache bust missing");
 
  assert.match(source,/function confirmAction\(/,"branded confirmation dialog missing");
  assert.match(source,/function removeRecord\(/,"admin product and promo deletion missing");
