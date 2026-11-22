@@ -839,3 +839,48 @@ body{background:#fbfafc;color:var(--ink)}
   .header .brand{flex-basis:126px!important;width:126px!important;min-width:126px!important;max-width:126px!important;height:52px!important}
   .header .header-action{min-width:33px!important;width:33px!important}
 }
+
+
+/* BAZOO purple category navigation — white icons and restrained active state */
+.category-topbar{
+  background:#5822af!important;
+  border-top:1px solid #6737b8!important;
+  border-bottom:1px solid #48188f!important;
+  box-shadow:0 4px 15px rgba(60,19,116,.13)!important;
+}
+.category-nav{min-height:55px!important;gap:7px!important}
+.category-nav-link{
+  color:#fff!important;
+  background:transparent!important;
+  border-radius:11px!important;
+  font-weight:800!important;
+  position:relative;
+  transition:background .18s ease,color .18s ease!important;
+}
+.category-nav-link .svg-icon{color:#fff!important;stroke-width:1.9}
+.category-nav-link:hover,
+.category-nav-link.active{
+  color:#fff!important;
+  background:rgba(255,255,255,.18)!important;
+}
+.category-nav-link:hover .svg-icon,
+.category-nav-link.active .svg-icon{color:#fff!important}
+.category-nav-link.active::after{
+  content:"";
+  position:absolute;
+  bottom:3px;
+  right:18px;
+  left:18px;
+  height:2px;
+  border-radius:8px;
+  background:#ff9a4c;
+}
+.category-nav-link:focus-visible{
+  outline:2px solid #ffb274;
+  outline-offset:2px;
+}
+@media(max-width:600px){
+  .category-nav{min-height:48px!important;gap:3px!important}
+  .category-nav-link{border-radius:9px!important;padding:10px 11px!important}
+  .category-nav-link.active::after{right:12px;left:12px;bottom:2px}
+}
