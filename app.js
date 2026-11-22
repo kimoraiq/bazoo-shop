@@ -9,7 +9,7 @@ const icon=(name,size=20,cls="")=>'<svg class="svg-icon '+cls+'" width="'+size+'
 const placeholder='<div class="placeholder"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#image"></use></svg></div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
+const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -272,11 +272,37 @@ async function authSubmit(f){
 }
 
 async function checkAdmin(){
- if(!state.user){state.admin=false;state.adminRole=null;state.adminPermissions={};renderCategoryNav();return}
- const {data,error}=await sb.from("admin_members").select("user_id,role,permissions").eq("user_id",state.user.id).maybeSingle();
- state.admin=!error&&!!data;
- state.adminRole=state.admin?data.role:null;
- state.adminPermissions=state.admin&&data.permissions&&typeof data.permissions==="object"?data.permissions:{};
+ // Always ask the server to identify the logged-in user from its verified JWT.
+ // Do not infer permissions from email, local storage or stale page state.
+ const account=state.user;
+ state.admin=false;
+ state.adminRole=null;
+ state.adminPermissions={};
+ state.authError="";
+ if(!account?.id){renderCategoryNav();return}
+ const userId=account.id;
+ try{
+  const {data,error}=await sb.rpc("my_admin_access");
+  if(state.user?.id!==userId)return;
+  if(!error&&data&&String(data.user_id)===String(userId)&&
+      ["owner","full","limited"].includes(data.role)){
+   state.admin=true;
+   state.adminRole=data.role;
+   state.adminPermissions=data.permissions&&typeof data.permissions==="object"?data.permissions:{};
+  }else if(error){
+   // Allow the previous self-row lookup as a compatibility fallback.
+   const direct=await sb.from("admin_members").select("user_id,role,permissions").eq("user_id",userId).maybeSingle();
+   if(state.user?.id!==userId)return;
+   if(!direct.error&&direct.data&&String(direct.data.user_id)===String(userId)&&
+      ["owner","full","limited"].includes(direct.data.role)){
+    state.admin=true;
+    state.adminRole=direct.data.role;
+    state.adminPermissions=direct.data.permissions&&typeof direct.data.permissions==="object"?direct.data.permissions:{};
+   }else state.authError=direct.error?.message||error.message||"تعذّر تحميل صلاحيات حساب المسؤول.";
+  }
+ }catch(err){
+  if(state.user?.id===userId)state.authError=err.message||"تعذّر التحقق من صلاحيات المسؤول.";
+ }
  renderCategoryNav();
 }
 function renderCategoryNav(){
@@ -311,7 +337,18 @@ async function loadCatalog(){
  state.catalogFailure=failed;renderCategoryNav();
  return !failed;
 }
-async function refreshAuth(){const {data}=await sb.auth.getUser();state.user=data?.user||null;await checkAdmin()}
+async function refreshAuth(){
+ state.authLoaded=false;
+ try{
+  const {data,error}=await sb.auth.getUser();
+  state.user=data?.user||null;
+  if(error)state.authError=error.message||"تعذّر التحقق من جلسة تسجيل الدخول.";
+  await checkAdmin();
+ }catch(err){
+  state.user=null;state.admin=false;state.adminRole=null;state.adminPermissions={};
+  state.authError=err.message||"تعذّر الاتصال بخدمة تسجيل الدخول.";
+ }finally{state.authLoaded=true}
+}
 async function submitOrder(f){
  const d=new FormData(f),p=String(d.get("phone")).trim();
  if(cartEntries().some(x=>x.p.is_demo))return notify("توجد منتجات تجريبية في السلة؛ لا يمكن تأكيد شرائها.");
@@ -348,7 +385,11 @@ async function render(){
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  document.querySelectorAll("#categoryNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  let content="";
- if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="brands")content=brandsPage();else if(route==="product"){state.galleryIndex=0;content=productDetailsPage(parts[1]||"");}else if(route==="favorites")content=favoritesPage();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice"><h2>التحقق من حساب المسؤول</h2><p>لم تُحمّل صلاحيات الإدارة لهذه الجلسة. يرجى تسجيل الدخول بحساب المالك أو تحديث الصفحة.</p><button class="btn primary" data-go="account">تسجيل الدخول إلى الحساب</button><button class="btn outline" id="retryAdminAccess">إعادة التحقق من الصلاحيات</button></div></div>';else content=home();
+ if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="brands")content=brandsPage();else if(route==="product"){state.galleryIndex=0;content=productDetailsPage(parts[1]||"");}else if(route==="favorites")content=favoritesPage();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice admin-access-notice"><h2>التحقق من حساب المسؤول</h2>'
+ +(state.authLoaded?'<p>'+(state.user?'الحساب المسجّل حالياً: <strong>'+esc(state.user.email||"غير معروف")+'</strong>. ':'لا توجد جلسة تسجيل دخول نشطة. ')
+ +(state.authError?'تعذّر التحقق من الصلاحيات: '+esc(state.authError):state.user?'لم يتم العثور على صلاحيات إدارة لهذا الحساب. تأكد من استخدام حساب المالك الرئيسي.':'يرجى تسجيل الدخول بحساب المالك الرئيسي.')+'</p>':'<p>جارٍ التحقق من تسجيل الدخول وصلاحيات الإدارة...</p>')
+ +'<div class="admin-access-actions"><button class="btn primary" data-go="account">'+(state.user?'إدارة الحساب':'تسجيل الدخول')+'</button>'
+ +'<button class="btn outline" id="retryAdminAccess" type="button">إعادة التحقق من الصلاحيات</button></div></div></div>';else content=home();
  if(state.route!==route)return;
  if(state.catalogFailure)content='<div class="connection-notice" role="alert">'+icon("circle-alert",20)+' <span>تعذّر الاتصال بقاعدة بيانات بازو. تأكد من الإنترنت ثم أعد المحاولة.</span> <button class="btn outline" id="retryCatalog">'+icon("refresh",16)+' إعادة المحاولة</button></div>'+content;
  $("#app").innerHTML=content;$("#app").querySelectorAll("form").forEach(f=>f.noValidate=true);
@@ -380,7 +421,7 @@ document.addEventListener("click",async e=>{
  if(b.dataset.passwordToggle){const input=document.querySelector('#authForm input[name="'+b.dataset.passwordToggle+'"]');if(input){const show=input.type==="password";input.type=show?"text":"password";b.innerHTML=icon(show?"eye-off":"eye",19);b.setAttribute("aria-label",show?"إخفاء كلمة المرور":"إظهار كلمة المرور")}return}
  if(b.id==="toCheckout"){if(cartEntries().some(x=>x.p.is_demo)){openModal("طلب تجريبي للمعاينة",'<p class="subtle">تحتوي سلة التسوق على منتجات تجريبية بأسعار توضيحية. يمكنك تصفحها، لكن تأكيد الشراء متاح للمنتجات الفعلية فقط.</p><button class="btn primary" data-go="categories">استعرض المنتجات</button>');return}if(!$("#cartGovernorate").value)return notify("يرجى اختيار المحافظة لحساب رسوم التوصيل.");state.selectedGovernorate=$("#cartGovernorate").value;go("checkout");return}
  if(b.id==="retryCatalog"){await loadCatalog();render();return}
- if(b.id==="retryAdminAccess"){await refreshAuth();await render();return}
+ if(b.id==="retryAdminAccess"){b.disabled=true;try{await refreshAuth();await loadCatalog();await render()}finally{b.disabled=false}return}
  if(b.id==="resetPassword"){const email=$('#authForm input[name="email"]')?.value.trim();if(!email)return notify("يرجى إدخال البريد الإلكتروني أولاً.");const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#/account"});notify(error?error.message:"إذا كان البريد الإلكتروني مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.");return}
  if(b.id==="signOut"){await sb.auth.signOut();state.user=null;state.admin=false;state.adminRole=null;state.adminPermissions={};renderCategoryNav();notify("تم تسجيل الخروج");go("home");return}
  if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;state.editProduct=null;pendingScroll="#adminTabContent";render();return}
