@@ -9,7 +9,7 @@ const icon=(name,size=20,cls="")=>'<svg class="svg-icon '+cls+'" width="'+size+'
 const placeholder='<div class="placeholder"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#image"></use></svg></div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"بالطريق",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
+const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -247,9 +247,11 @@ async function authSubmit(f){
 }
 
 async function checkAdmin(){
- if(!state.user){state.admin=false;return}
- const {data,error}=await sb.from("admin_members").select("user_id").eq("user_id",state.user.id).maybeSingle();
+ if(!state.user){state.admin=false;state.adminRole=null;state.adminPermissions={};return}
+ const {data,error}=await sb.from("admin_members").select("user_id,role,permissions").eq("user_id",state.user.id).maybeSingle();
  state.admin=!error&&!!data;
+ state.adminRole=state.admin?data.role:null;
+ state.adminPermissions=state.admin&&data.permissions&&typeof data.permissions==="object"?data.permissions:{};
 }
 function renderCategoryNav(){
  const root=document.querySelector("#categoryNav");if(!root)return;
@@ -313,7 +315,7 @@ function chooseProvince(name,context){
 function shippingBind(sel,ship,total){
  const s=$(sel);if(!s)return;s.addEventListener("change",()=>{const rate=state.rates.find(x=>x.governorate===s.value&&x.enabled);const label=document.querySelector(s.id==="cartGovernorate"?"#cartProvinceLabel":"#orderProvinceLabel");if(label)label.textContent=s.value||"اختار المحافظة";$(ship).textContent=rate?money(rate.price_iqd):"اختر محافظة متاحة";$(total).textContent=rate?money(subtotal()+rate.price_iqd):money(subtotal())+" + التوصيل"});
 }
-const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy}=createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction});
+const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy,saveMember}=createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction});
 async function render(){
  const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
@@ -361,7 +363,7 @@ document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.
 let searchDebounce;document.addEventListener("input",e=>{
  if(e.target.id==="provinceSearch"){const q=e.target.value.trim();document.querySelectorAll(".province-item").forEach(x=>x.hidden=!x.textContent.includes(q));return}
  if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
-document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target)});
+document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target);if(id==="adminMemberForm")await saveMember(e.target)});
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",render);
