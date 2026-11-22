@@ -29,7 +29,7 @@ function alertUser(message,type="error"){
  }
 }
 function clearAlert(){byId("alert").hidden=true}
-function can(scope){return !!state.user&&(scope==="overview"||state.role==="owner"||state.role==="full"||state.permissions[scope]===true)}
+function can(scope){return !!state.user&&state.adminVerified&&(scope==="overview"||state.role==="owner"||state.role==="full"||state.permissions[scope]===true)}
 function tabKeys(){return Object.keys(SCOPE).filter(key=>key==="members"?state.role==="owner":can(key))}
 function renderNav(){
  const nav=byId("nav"),tabs=tabKeys();
@@ -184,7 +184,7 @@ function renderProducts(){
  +statCard("المنتجات المنشورة",rows.filter(x=>x.active).length,"check-circle","تظهر في المتجر")
  +statCard("المنتجات المخفية",rows.filter(x=>!x.active).length,"eye-off","غير ظاهرة للعملاء")
  +statCard("العروض الحالية",rows.filter(x=>x.on_sale).length,"percent","منتجات ضمن العروض")+'</div>'
- +'<div class="section-head"><div><h2>كتالوج المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div>'
+ +'<div class="section-head"><div><h2>إدارة المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div>'
  +table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
 }
 function renderTaxonomy(tableName){
@@ -247,19 +247,24 @@ function showProduct(id){
  const spec=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications).map(x=>x[0]+": "+x[1]).join("\n"):"";
  const options=catalogOptions("categories").filter(([key])=>!key||(state.records.categories||[]).find(x=>String(x.id)===key)?.parent_id);
  openDialog(id?"تعديل المنتج":"إضافة منتج",makeForm("productForm",
+  sectionHeading("البيانات الأساسية","تعريف المنتج وتصنيفه","package")+
   field("اسم المنتج *","name",p.name||"",'required minlength="2" maxlength="180"')+
   selectField("الفئة *","category_id",options,p.category_id,'required')+
   selectField("العلامة التجارية","brand_id",catalogOptions("brands"),p.brand_id)+
+  sectionHeading("التسعير والمخزون","الأسعار بالدينار العراقي","percent")+
   field("السعر الأصلي (د.ع) *","price",original,'type="number" required min="1" step="1"')+
   field("الخصم (%)","discount",percentage,'type="number" min="0" max="99" step="1"')+
   field("الكمية في المخزون *","stock",p.stock??0,'type="number" required min="0" step="1"')+
   field("رمز المنتج","sku",p.sku||"")+
+  sectionHeading("خيارات النشر","تحكّم في ظهور المنتج للعملاء","eye")+
   booleanSelect("منشور","active",p.active!==false)+
   booleanSelect("منتج مميز","featured",p.featured===true)+
   booleanSelect("عرض خاص","on_sale",p.on_sale===true)+
   booleanSelect("نموذج للعرض فقط","is_demo",p.is_demo===true)+
+  sectionHeading("التفاصيل والمواصفات","اجعل وصف المنتج أكثر وضوحاً","clipboard")+
   textField("الوصف","description",p.description||"")+
   textField("المواصفات: اكتب المفتاح: القيمة لكل سطر","specs",spec)+
+  sectionHeading("صور المنتج","رفع مباشر مع ضغط تلقائي","image")+
   '<label class="field">الصورة الرئيسية<input name="coverPhoto" type="file" class="input" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">ضغط تلقائي إلى 15 كيلوبايت؛ الصورة القديمة محفوظة ما لم ترفع صورة جديدة.</span></label>'+
   '<label class="field">صور إضافية<input name="photos" type="file" class="input" multiple accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حتى 8 صور إضافية، 15 كيلوبايت للصورة.</span></label>'+
   '<input type="hidden" name="id" value="'+html(p.id||"")+'">'+formFooter("حفظ المنتج")
@@ -270,6 +275,7 @@ function showTaxonomy(table,id){
  const cat=table==="categories";
  const main=cat?selectField("الفئة الرئيسية","parent_id",[["","فئة رئيسية"],...(state.records.categories||[]).filter(x=>!x.parent_id&&String(x.id)!==String(p.id)).map(x=>[String(x.id),x.name])],p.parent_id):"";
  openDialog(id?"تعديل "+SCOPE[table]:"إضافة "+SCOPE[table],makeForm("taxonomyForm",
+ sectionHeading("بيانات "+SCOPE[table],"اسم واضح ومعرّف فريد","grid")+
  field("الاسم *","name",p.name||"",'required minlength="2" maxlength="100"')+
  field("المعرّف بالإنجليزية","slug",p.slug||"",'pattern="[a-z0-9-]*"')+main+
  (cat?field("الترتيب","sort_order",p.sort_order||0,'type="number" min="0"'): "")+
@@ -281,15 +287,18 @@ function showPromo(id){
  const p=id?findRecord("promotions",id):{};
  const choices=(state.records.products||[]).map(x=>[String(x.id),x.name]);
  openDialog(id?"تعديل الإعلان":"إضافة إعلان",makeForm("promoForm",
+ sectionHeading("معلومات الإعلان","محتوى اللافتة ووجهة الانتقال","sparkles")+
  field("عنوان الإعلان *","title",p.title||"",'required maxlength="90"')+
  field("النص التوضيحي","subtitle",p.subtitle||"")+
  selectField("مكان العرض","placement",[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]],p.placement||"home")+
  selectField("ربط بمنتج","product_id",[["","بدون منتج"],...choices],p.product_id)+
  selectField("الوجهة","link_url",[["#/categories","جميع المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]],p.link_url||"#/categories")+
  field("الترتيب","sort_order",p.sort_order||0,'type="number" min="0"')+
+ sectionHeading("إعدادات الظهور","تحكّم في حالة العرض","eye")+
  booleanSelect("منشور","active",p.active!==false)+
  booleanSelect("صورة جاهزة تحتوي التصميم","artwork_only",p.artwork_only!==false)+
  booleanSelect("إعلان تجريبي","is_demo",p.is_demo===true)+
+ sectionHeading("الصور الإعلانية","نسخة للحاسوب ونسخة للهاتف","image")+
  '<label class="field">صورة الحاسوب (1440 × 480)<input name="desktop" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
  '<label class="field">صورة الهاتف (720 × 900)<input name="mobile" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
  '<input type="hidden" name="id" value="'+html(p.id||"")+'">'+formFooter("حفظ الإعلان")
@@ -299,6 +308,7 @@ function showMember(id){
  const member=id?findRecord("members",id):{};
  const scopes=Object.entries(SCOPE).filter(([k])=>k!=="members");
  openDialog(id?"تعديل صلاحيات المسؤول":"إضافة مسؤول",makeForm("memberForm",
+ sectionHeading("حساب المسؤول","إدارة آمنة وصلاحيات محددة","shield-check")+
  field("البريد الإلكتروني المسجل والمؤكد *","email",member.email||"", 'type="email" required '+(member.user_id?"readonly":""))+
  selectField("الرتبة","role",[["full","مسؤول بصلاحيات كاملة"],["limited","مسؤول محدود"]],member.role||"limited")+
  '<div class="full"><p class="help">اختر الصلاحيات المسموحة للمسؤول المحدود. لا يمكن تغيير حساب المالك الرئيسي.</p><div class="staff-permissions">'+scopes.map(([k,label])=>'<label><input type="checkbox" name="scope_'+k+'" '+(member.permissions?.[k]?"checked":"")+'> '+label+'</label>').join("")+'</div></div>'+
@@ -489,11 +499,13 @@ async function saveOrder(control){
  return "تم تحديث الحالة إلى "+STATUS[status]+" والتحقق منها.";
 }
 function customConfirm(message,action){
- openDialog("تأكيد العملية",'<div class="full"><p>'+html(message)+'</p><div class="form-actions"><button type="button" class="button danger" id="confirmAction">تأكيد</button><button type="button" class="button secondary" data-action="close">إلغاء</button></div></div>');
+ openDialog("تأكيد الحذف",
+  '<div class="dialog-confirm"><span class="dialog-confirm-icon">'+glyph("circle-alert")+'</span><div><p>'+html(message)+'</p><small>لا يمكن التراجع عن هذا الإجراء بعد تأكيده.</small></div></div>'+
+  '<div class="form-actions"><button type="button" class="button danger" id="confirmAction">'+glyph("check-circle")+'تأكيد الحذف</button><button type="button" class="button secondary" data-action="close">إلغاء</button></div>');
  byId("confirmAction").onclick=async()=>{
   const button=byId("confirmAction");button.disabled=true;
   try{
-   const message=await action();closeDialog();alertUser(message,"success");await reload();
+   const result=await action();closeDialog();alertUser(result,"success");await reload();
   }catch(error){alertUser(error.message);button.disabled=false}
  };
 }
@@ -512,7 +524,7 @@ async function authenticate(){
 function renderLogin(message=""){
  title("تسجيل دخول المسؤول");
  byId("nav").innerHTML="";
- byId("content").innerHTML='<section class="auth-wrap surface"><h2>تسجيل الدخول إلى إدارة بازو</h2><p class="help">تستخدم هذه اللوحة حساب Supabase المسجّل والمخول فقط، ولا تعتمد على صلاحيات محفوظة في المتصفح.</p>'+
+ byId("content").innerHTML='<section class="auth-wrap surface"><img class="auth-mark" src="./%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png" alt="شعار بازو"><h2>مرحباً بك في إدارة بازو</h2><p class="help">سجّل الدخول إلى حساب المسؤول المصرّح له للتحكم بمتجرك بأمان.</p>'+
  (message?'<p class="notice-line">'+html(message)+'</p>':"")+
  '<form id="loginForm" class="form-grid">'+field("البريد الإلكتروني","email",state.user?.email||"",'type="email" required')+field("كلمة المرور","password","",'type="password" required')+formFooter("تسجيل الدخول")+'</form></section>';
  renderNav();
@@ -588,6 +600,21 @@ document.addEventListener("click",async event=>{
  if(actionName==="delete")customConfirm("سيُحذف العنصر المحدد نهائياً. هل أنت متأكد؟",()=>deleteRecord(table,id));
 });
 byId("closeDialog").onclick=closeDialog;
+function closeMobileMenu(){
+ const sidebar=byId("adminSidebar"),backdrop=byId("sidebarBackdrop"),toggle=byId("menuToggle");
+ sidebar?.classList?.remove("mobile-open");
+ if(backdrop)backdrop.hidden=true;
+ toggle?.setAttribute?.("aria-expanded","false");
+}
+function toggleMobileMenu(){
+ const sidebar=byId("adminSidebar"),backdrop=byId("sidebarBackdrop"),toggle=byId("menuToggle");
+ const opening=!sidebar?.classList?.contains("mobile-open");
+ sidebar?.classList?.toggle("mobile-open",opening);
+ if(backdrop)backdrop.hidden=!opening;
+ toggle?.setAttribute?.("aria-expanded",String(opening));
+}
+byId("menuToggle")?.addEventListener?.("click",toggleMobileMenu);
+byId("sidebarBackdrop")?.addEventListener?.("click",closeMobileMenu);
 byId("overlay").addEventListener("click",event=>{if(event.target===byId("overlay"))closeDialog()});
 byId("refresh").onclick=async()=>{clearAlert();await reload()};
 byId("signOut").onclick=async()=>{await db.auth.signOut();state.user=null;state.adminVerified=false;state.role=null;closeDialog();renderLogin();alertUser("تم تسجيل الخروج.","success")};
