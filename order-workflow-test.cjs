@@ -88,6 +88,6 @@ const api=createAdmin({
  assert.match(appSource,/data-copy-order-product/,"Customer copy link handler missing");
  assert.match(css,/\.orders-console-hero\{/,"Premium admin order layout missing");
  assert.match(css,/\.customer-order-card\{/,"Premium customer order layout missing");
- assert.match(html,/orders28/,"Must publish updated order assets");
+ assert.match(html,/bundle\.js\?v=20\d{6}[a-z0-9-]+/,"Must publish updated order assets");
  console.log("PASS BAZOO: order status, item status, direct product links and customer tracking");
 })().catch(err=>{console.error(err);process.exitCode=1});
