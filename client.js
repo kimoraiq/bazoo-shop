@@ -11,16 +11,32 @@ export function createClient(baseUrl, publishableKey) {
   try{const s=JSON.parse(localStorage.getItem(storageKey)||"null");if(s?.access_token&&s?.refresh_token)session=s;}catch(e){}
   const save=()=>{try{session?localStorage.setItem(storageKey,JSON.stringify(session)):localStorage.removeItem(storageKey);}catch(e){}};
   const emit=(event)=>listeners.forEach(fn=>{try{fn(event,session)}catch(e){console.warn("Auth callback error",e)}});
+  // A single refresh request is shared by every concurrent query. Refresh tokens
+  // rotate, so simultaneous refreshes can invalidate an otherwise valid session.
+  let refreshPromise=null;
   const getToken=async()=>{
     if(!session?.access_token)return null;
     const expires=Number(session.expires_at||0);
     if(!expires||expires>Date.now()/1000+60)return session.access_token;
-    try{
-      const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:JSON.stringify({refresh_token:session.refresh_token})},false);
-      if(!res.ok)throw new Error(res.error?.message||"انتهت صلاحية الجلسة. يرجى تسجيل الدخول مجدداً.");
+    if(refreshPromise)return refreshPromise;
+    const previousRefreshToken=session.refresh_token;
+    refreshPromise=(async()=>{
+      const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{
+        method:"POST",body:JSON.stringify({refresh_token:previousRefreshToken})
+      },false);
+      if(!res.ok){
+        // Connection errors should not erase the login. Only reject a genuinely
+        // revoked/expired refresh token, and never clear a newer session.
+        if([400,401].includes(res.status)&&session?.refresh_token===previousRefreshToken){
+          session=null;save();emit("SIGNED_OUT");
+        }
+        return null;
+      }
+      if(session?.refresh_token!==previousRefreshToken)return session?.access_token||null;
       setSession(res.data,"TOKEN_REFRESHED");
       return session?.access_token||null;
-    }catch(e){session=null;save();emit("SIGNED_OUT");return null}
+    })();
+    try{return await refreshPromise}finally{refreshPromise=null}
   };
   const setSession=(data,event="SIGNED_IN")=>{
     if(!data?.access_token)return;
