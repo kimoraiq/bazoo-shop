@@ -92,11 +92,8 @@ function drawHero(){
  return '<div class="merch-slider-inner"><div class="merch-content"><span class="merch-eyebrow">'+icon("sparkles",17)+' اكتشف عالم BAZOO</span><h1>'+esc(slide.title)+(slide.accent?'<br><b>'+esc(slide.accent)+'</b>':'')+'</h1><p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons">'+button+'<button class="btn ghost" data-go="offers">تصفح العروض</button></div></div><div class="merch-visual"><div class="merch-orbit"></div>'+visual+'</div></div><div class="slider-controls"><button data-slide="-1" aria-label="الشريحة السابقة">'+icon("chevron-right",18)+'</button><div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(index===i?'active':'')+'" aria-label="الشريحة '+(i+1)+'" aria-current="'+(index===i?'true':'false')+'"></button>').join("")+'</div><button data-slide="1" aria-label="الشريحة التالية">'+icon("chevron-left",18)+'</button></div>';
 }
 function categoryCircles(){
- const list=homeCategoryDefaults.map(d=>{
-  const found=state.categories.find(c=>c.slug===d.slug&&c.active);
-  return {...d,id:found?.id,icon:slugIcons[d.slug]||"grid"};
- });
- return '<div class="home-categories">'+list.map(c=>'<button class="round-category" '+(c.id?'data-cat="'+c.id+'"':'data-go="categories"')+'><span class="category-circle">'+icon(c.icon,56)+'</span><span class="category-name">'+esc(c.name)+'</span></button>').join("")+'</div>';
+ const list=state.categories.length?state.categories.filter(c=>c.active&&c.parent_id).map(c=>({id:c.id,slug:c.slug,name:c.name})):homeCategoryDefaults.map(c=>({...c,id:null}));
+ return '<div class="home-categories">'+list.map(c=>'<button class="round-category" '+(c.id?'data-cat="'+c.id+'"':'data-go="categories"')+'><span class="category-circle">'+icon(slugIcons[c.slug]||"grid",56)+'</span><span class="category-name">'+esc(c.name)+'</span></button>').join("")+'</div>';
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
@@ -184,6 +181,15 @@ async function checkAdmin(){
  const {data,error}=await sb.from("admin_members").select("user_id").eq("user_id",state.user.id).maybeSingle();
  state.admin=!error&&!!data;
 }
+function renderCategoryNav(){
+ const root=document.querySelector("#categoryNav");if(!root)return;
+ const main=state.categories.filter(c=>c.active&&!c.parent_id);
+ if(!main.length)return;
+ const links='<button class="category-nav-link" data-go="home">'+icon("home",18)+' الرئيسية</button><button class="category-nav-link" data-go="categories">'+icon("grid",18)+' الكل</button>'
+  +main.map(c=>'<button class="category-nav-link" data-cat="'+c.id+'">'+icon(c.slug==="appliances"?"plug":c.slug==="electronics"?"laptop":c.slug==="stationery"?"book-open":"grid",18)+' '+esc(c.name)+'</button>').join("")
+  +'<button class="category-nav-link" data-go="brands">'+icon("tag",18)+' العلامات التجارية</button><button class="category-nav-link" data-go="offers">'+icon("percent",18)+' العروض</button><button class="category-nav-link nav-admin-entry" data-go="market">'+icon("store",18)+' أضف متجرك</button>';
+ root.innerHTML=links;
+}
 async function loadCatalog(){
  const requests=[
   ["categories",()=>sb.from("categories").select("*").order("sort_order")],
@@ -202,7 +208,7 @@ async function loadCatalog(){
   if(out.status==="fulfilled")state[requests[i][0]]=out.value;
   else {failed=true;console.warn("BAZOO catalog:",out.reason);}
  });
- state.catalogFailure=failed;
+ state.catalogFailure=failed;renderCategoryNav();
  return !failed;
 }
 async function refreshAuth(){const {data}=await sb.auth.getUser();state.user=data?.user||null;await checkAdmin()}
