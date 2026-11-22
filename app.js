@@ -1,0 +1,138 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm";
+const sb=createClient("https://kgghxcxaqmuypcdwubhr.supabase.co","sb_publishable_TZKy9nGrNFu1KqZqBpsw3Q_x17cq1qy",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const $=s=>document.querySelector(s);
+const money=n=>new Intl.NumberFormat("en-US").format(Number(n)||0)+" د.ع";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeImg=s=>/^https:\/\//i.test(String(s||""))?esc(s):"";
+const placeholder='<div class="placeholder">▣</div>';
+const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"بالطريق",delivered:"تم التسليم",cancelled:"ملغي"};
+const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
+const state={products:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],user:null,admin:false,route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,adminTab:"products",editProduct:null};
+try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
+if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
+if(!Array.isArray(state.favs))state.favs=[];
+function persist(){try{localStorage.setItem("bazoo_cart_v2",JSON.stringify(state.cart));localStorage.setItem("bazoo_favs_v2",JSON.stringify(state.favs))}catch(e){};$("#cartBadge").textContent=Object.values(state.cart).reduce((s,n)=>s+Number(n||0),0)||""}
+function notify(msg){const x=$("#toast");x.textContent=msg;x.classList.add("show");clearTimeout(notify.timer);notify.timer=setTimeout(()=>x.classList.remove("show"),3800)}
+function openModal(title,html){$("#modalTitle").textContent=title;$("#modalBody").innerHTML=html;$("#modal").classList.add("show");$("#modalBackdrop").classList.add("show");document.body.style.overflow="hidden"}
+function closeModal(){$("#modal").classList.remove("show");$("#modalBackdrop").classList.remove("show");document.body.style.overflow=""}
+$("#closeModal").onclick=closeModal;$("#modalBackdrop").onclick=closeModal;document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
+function go(route){location.hash="#/"+route;if(location.hash==="#/"+route)render()}
+function catName(id){return state.categories.find(x=>x.id===id)?.name||"منتج"}
+function brandName(id){return state.brands.find(x=>x.id===id)?.name||""}
+const activeProducts=()=>state.products.filter(p=>p.active);
+function filterProducts({category=state.category,brand=state.brand,q=state.q,onSale=false}={}){
+ const descendants=category?state.categories.filter(c=>String(c.parent_id)===String(category)).map(c=>c.id):[];
+ return activeProducts().filter(p=>{
+ const matchCat=!category||String(p.category_id)===String(category)||descendants.some(id=>String(id)===String(p.category_id));
+ return matchCat&&(!brand||String(p.brand_id)===String(brand))&&(!onSale||p.on_sale||(p.compare_at_iqd>p.price_iqd))&&(!q||(p.name+" "+p.description+" "+brandName(p.brand_id)).toLowerCase().includes(q.toLowerCase()));
+ });
+}
+function sectionHead(kicker,title,subtitle=""){return '<div class="section-head"><div><div class="kicker">'+esc(kicker)+'</div><h2>'+esc(title)+'</h2>'+(subtitle?'<p class="subtle">'+esc(subtitle)+'</p>':'')+'</div></div>'}
+function productCard(p){
+ const photo=safeImg(p.image_url);
+ return '<article class="product"><div class="prodimage" data-detail="'+p.id+'" role="button" tabindex="0" aria-label="تفاصيل '+esc(p.name)+'">'+(photo?'<img src="'+photo+'" loading="lazy" alt="'+esc(p.name)+'">':placeholder)+(p.on_sale?'<span class="tag">عرض</span>':p.featured?'<span class="tag">مميز</span>':'')+'</div><div class="prodinfo"><small>'+esc(brandName(p.brand_id)||catName(p.category_id))+'</small><h3>'+esc(p.name)+'</h3><div><strong class="cost">'+money(p.price_iqd)+'</strong>'+(p.compare_at_iqd>p.price_iqd?'<span class="old">'+money(p.compare_at_iqd)+'</span>':'')+'</div><div class="prodfoot"><button class="btn primary" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+(p.stock<1?'نفد المخزون':'＋ أضف للعربة')+'</button><button class="heart '+(state.favs.includes(p.id)?"on":"")+'" data-fav="'+p.id+'" aria-label="المفضلة">'+(state.favs.includes(p.id)?"♥":"♡")+'</button></div></div></article>';
+}
+function productGrid(ps){return ps.length?'<div class="grid-products">'+ps.map(productCard).join("")+'</div>':'<div class="notice">ماكو منتجات منشورة بهذا القسم حالياً. راح تظهر المنتجات هنا من يضيفها فريق بازو 💜</div>'}
+function promoFrame(place){const x=state.promos.filter(p=>p.active&&p.placement===place);if(!x.length)return "";const p=x[state.promoIndex%x.length];return '<div class="promo-frame">'+(p.image_url&&safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="'+esc(p.title)+'">':'')+'<h2>'+esc(p.title)+'</h2><p class="subtle">'+esc(p.subtitle)+'</p>'+(p.link_url?.startsWith("#/")?'<a href="'+esc(p.link_url)+'" class="btn accent">اكتشف المزيد</a>':'')+(x.length>1?'<div class="row" style="margin-top:15px"><button class="btn outline" data-slide="-1">السابق</button><span>'+((state.promoIndex%x.length)+1)+' / '+x.length+'</span><button class="btn outline" data-slide="1">التالي</button></div>':'')+'</div>'}
+function home(){
+ const cats=state.categories.filter(c=>!c.parent_id&&c.active);
+ const featured=activeProducts().filter(p=>p.featured).slice(0,8);
+ const picked=(featured.length?featured:activeProducts().slice(0,8));
+ return '<section class="hero"><div class="hero-content"><div class="pill">✨ عالم بازو للتسوّق</div><h1>كل اللي تحتاجه،<br><span>بمكان واحد.</span></h1><p>من الأجهزة الكهربائية للإلكترونيات والقرطاسية — اختر منتجاتك بسهولة ووصل طلبك لعنوانك.</p><div class="hero-buttons"><button class="btn accent" data-go="categories">تسوّق هسه ←</button><button class="btn ghost" data-go="offers">شوف العروض</button></div></div><div class="hero-graphic"><div class="hero-disc"><span class="hero-symbol">🛍️</span></div></div></section><div class="benefits"><div class="benefit"><i>🚚</i><div><strong>توصيل للمحافظات المفعّلة</strong><small>الأجور تظهر بالعربة</small></div></div><div class="benefit"><i>📦</i><div><strong>مخزون محدّث</strong><small>حسب توفر المنتجات</small></div></div><div class="benefit"><i>🔒</i><div><strong>حساب وطلباتك</strong><small>تصفح بدون تسجيل</small></div></div><div class="benefit"><i>💜</i><div><strong>منتجات متنوعة</strong><small>من فئات وعلامات متعددة</small></div></div></div>'+promoFrame("home")+'<section class="section">'+sectionHead("اختار اللي يناسبك","تسوّق حسب الفئة")+'<div class="cat-grid">'+cats.map(c=>'<button class="cat-tile" data-cat="'+c.id+'"><strong>'+esc(c.name)+'</strong><small>استكشف المنتجات ←</small></button>').join("")+'</div></section><section class="section">'+sectionHead("اختيارات المتجر","منتجات مميزة","المنتجات والأسعار يتم تحديثها من فريق بازو")+productGrid(picked)+'</section><section class="promo-card"><div class="kicker">BAZOO 🧡</div><h2>عروض جديدة تنتظرك</h2><p>تصفح المنتجات المحددة كعروض مباشرة من فريق بازو.</p><button class="btn accent" data-go="offers">استكشف العروض ←</button></section>';
+}
+function filters(){return '<div class="filter-panel"><label>القسم<select id="categoryFilter"><option value="">كل الأقسام</option>'+state.categories.filter(c=>c.active).map(c=>'<option value="'+c.id+'" '+(String(c.id)===String(state.category)?"selected":"")+'>'+(c.parent_id?"— ":"")+esc(c.name)+'</option>').join("")+'</select></label><label>العلامة التجارية<select id="brandFilter"><option value="">كل العلامات</option>'+state.brands.filter(b=>b.active).map(b=>'<option value="'+b.id+'" '+(String(b.id)===String(state.brand)?"selected":"")+'>'+esc(b.name)+'</option>').join("")+'</select></label><label>بحث عن منتج<input class="field" id="filterSearch" value="'+esc(state.q)+'" placeholder="اسم المنتج أو الماركة..."></label></div>'}
+function categories(){return '<div class="page"><h1>الفئات والعلامات التجارية</h1><p class="subtle">حدد القسم أو العلامة التجارية حتى تطلعلك المنتجات المناسبة</p>'+promoFrame("categories")+filters()+'<div class="section">'+sectionHead("المنتجات","اكتشف المنتجات")+productGrid(filterProducts())+'</div></div>'}
+function offers(){return '<div class="page"><h1>عروض بازو 🧡</h1><p class="subtle">المنتجات المختارة للتخفيضات والعروض من قبل الفريق</p>'+productGrid(filterProducts({category:"",brand:"",q:"",onSale:true}))+'</div>'}
+function market(){return '<div class="page"><div class="notice" style="margin:45px auto;max-width:600px"><div style="font-size:60px">🏪</div><h1>أضف متجرك</h1><p>قريباً سيتاح هذا القسم. نشتغل على تجربة مميزة لأصحاب المتاجر.</p><button class="btn primary" data-go="home">الرجوع للرئيسية</button></div></div>'}
+function cartEntries(){return Object.entries(state.cart).map(([id,qty])=>({p:state.products.find(p=>p.id===id),qty:Number(qty)})).filter(x=>x.p&&x.qty>0)}
+function subtotal(){return cartEntries().reduce((s,x)=>s+x.p.price_iqd*x.qty,0)}
+function cart(){
+ const rows=cartEntries();const options=state.rates.filter(x=>x.enabled);
+ const shippingOptions='<option value="">اختار المحافظة</option>'+govs.map(g=>'<option value="'+esc(g)+'" '+(options.find(x=>x.governorate===g)?'':'disabled')+'>'+esc(g)+(options.find(x=>x.governorate===g)?"":" — التوصيل غير متاح حالياً")+'</option>').join("");
+ return '<div class="page"><h1>عربة التسوّق 🛒</h1><p class="subtle">راجع المنتجات قبل تأكيد الطلب</p>'+(!rows.length?'<div class="notice"><h2>عربتك فارغة حالياً</h2><button class="btn accent" data-go="categories">ابدأ التسوق</button></div>':'<div class="two-col"><section class="card"><h2 class="sectiontitle">المنتجات ('+rows.length+')</h2>'+rows.map(({p,qty})=>'<div class="cartrow"><div class="cartpic">'+(safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="'+esc(p.name)+'">':placeholder)+'</div><div><strong>'+esc(p.name)+'</strong><p class="cost">'+money(p.price_iqd)+'</p><div class="qty"><button data-qty="'+p.id+'" data-step="-1">−</button>'+qty+'<button data-qty="'+p.id+'" data-step="1" '+(qty>=p.stock?"disabled":"")+'>＋</button></div></div><button class="btn danger" data-remove="'+p.id+'">حذف</button></div>').join("")+'</section><aside class="card"><h2 class="sectiontitle">ملخص الطلب</h2><div class="row summaryline"><span>مجموع المنتجات</span><strong>'+money(subtotal())+'</strong></div><label class="formgroup" style="margin:15px 0">المحافظة لحساب التوصيل<select id="cartGovernorate" class="field">'+shippingOptions+'</select></label><div class="row summaryline"><span>التوصيل</span><strong id="shippingPrice">اختر المحافظة</strong></div><div class="row summaryline"><b>المجموع</b><strong id="grandTotal">'+money(subtotal())+' + التوصيل</strong></div><button class="btn accent" id="toCheckout" style="width:100%;margin-top:19px">متابعة الطلب ←</button><p class="note">تأكيد الطلب يتطلب حساباً مسجّلاً. الدفع عند الاستلام أو التنسيق عبر واتساب.</p></aside></div>')+'<section class="section">'+sectionHead("قد يعجبك أيضاً","منتجات مشابهة")+productGrid(activeProducts().filter(p=>!state.cart[p.id]).slice(0,4))+'</section>'+promoFrame("cart")+'</div>';
+}
+function checkout(){if(!cartEntries().length)return cart();if(!state.user){state.checkoutPending=true;return authView("أكمل التسجيل أو الدخول حتى تأكد طلبك");}
+ const selected=state.rates.filter(x=>x.enabled);
+ return '<div class="page"><h1>تأكيد الطلب</h1><p class="subtle">تأكد من معلوماتك والتوصيل قبل إرسال طلبك</p><div class="two-col"><form class="card" id="orderForm"><div class="formgrid"><label class="formgroup">الاسم الكامل *<input name="customer_name" required minlength="2" maxlength="120" class="field" autocomplete="name"></label><label class="formgroup">رقم الهاتف * (11 رقم)<input name="phone" class="field" inputmode="numeric" autocomplete="tel" required pattern="07[0-9]{9}" minlength="11" maxlength="11" placeholder="07XXXXXXXXX"></label><label class="formgroup">المحافظة *<select name="governorate" id="orderGovernorate" class="field" required><option value="">اختر المحافظة</option>'+govs.map(g=>'<option value="'+esc(g)+'" '+(selected.some(x=>x.governorate===g)?"":"disabled")+'>'+esc(g)+(selected.some(x=>x.governorate===g)?"":" — غير مفعّلة")+'</option>').join("")+'</select></label><label class="formgroup">طريقة الدفع *<select name="payment" class="field" required><option value="cod">الدفع عند الاستلام</option><option value="whatsapp">التنسيق عبر واتساب للدفع الإلكتروني</option></select></label><label class="formgroup fullspan">العنوان الكامل وأقرب نقطة دالة *<textarea class="field" name="address" minlength="8" maxlength="500" required placeholder="المنطقة، الزقاق، رقم الدار، أقرب نقطة دالة"></textarea></label><label class="formgroup fullspan">ملاحظات (اختياري)<textarea name="note" class="field" maxlength="1000"></textarea></label></div><p class="note">الطلب يُحفظ في النظام بعد تأكيدك. خيار واتساب يعني تنسيق الدفع مع الفريق وليس دفعاً إلكترونياً فورياً.</p><button class="btn accent" type="submit">تأكيد الطلب وحفظه ←</button></form><aside class="card"><h2 class="sectiontitle">تفاصيل طلبك</h2>'+cartEntries().map(({p,qty})=>'<div class="row summaryline"><span>'+esc(p.name)+' × '+qty+'</span><strong>'+money(p.price_iqd*qty)+'</strong></div>').join("")+'<div class="row summaryline"><strong>المنتجات</strong><strong>'+money(subtotal())+'</strong></div><div class="row summaryline"><span>أجور التوصيل</span><strong id="checkoutShip">اختار المحافظة</strong></div><div class="row summaryline"><b>المجموع</b><strong id="checkoutTotal">'+money(subtotal())+' + التوصيل</strong></div></aside></div></div>';
+}
+function authView(title="حسابي"){return '<div class="page"><div class="card auth-panel"><h1>'+esc(title)+'</h1><p class="subtle">تگدر تتصفح المتجر بدون حساب. التسجيل مطلوب فقط عند تأكيد الطلب أو متابعة الطلبات.</p><div class="adminnav"><button class="active" data-auth-mode="login">دخول</button><button data-auth-mode="signup">إنشاء حساب</button></div><form id="authForm" class="stack"><input type="hidden" name="mode" value="login"><label class="formgroup">البريد الإلكتروني<input type="email" name="email" class="field" required autocomplete="email"></label><label class="formgroup">كلمة المرور (6 أحرف على الأقل)<input type="password" name="password" class="field" required minlength="6" autocomplete="current-password"></label><button type="submit" class="btn primary">دخول</button></form><p id="authMessage" class="subtle"></p><button class="linkbtn" id="resetPassword">نسيت كلمة المرور؟</button></div></div>'}
+async function account(){if(!state.user)return authView();const {data,error}=await sb.from("orders").select("id,created_at,status,subtotal_iqd,shipping_iqd,total_iqd,governorate,payment_method,order_items(product_name,quantity,unit_price_iqd)").order("created_at",{ascending:false}).limit(60);return '<div class="page"><div class="row"><div><h1>حسابي وطلباتي</h1><p class="user-info">'+esc(state.user.email)+'</p></div><button class="btn outline" id="signOut">تسجيل خروج</button></div><div class="section"><h2>طلباتي</h2>'+(error?'<p class="error">تعذر تحميل الطلبات</p>':!(data||[]).length?'<div class="notice">ما عندك طلبات بعد. تگدر تتصفح المنتجات وتطلب من المتجر.</div>':data.map(o=>'<div class="order"><div class="row"><div><strong class="orderid">'+esc(o.id.slice(0,8).toUpperCase())+'</strong><p class="subtle">'+new Date(o.created_at).toLocaleDateString("ar-IQ")+' — '+esc(o.governorate)+'</p></div><span class="status">'+esc(label[o.status]||o.status)+'</span></div><p>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join('، ')+'</p><strong class="cost">'+money(o.total_iqd)+'</strong></div>').join(""))+'</div>'+(state.admin?'<button class="btn primary" data-go="admin">لوحة إدارة المتجر</button>':'')+'</div>'}
+function detail(id){const p=state.products.find(x=>x.id===id);if(!p)return;openModal(p.name,'<div style="margin-top:18px">'+(safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" style="width:100%;max-height:320px;object-fit:contain;background:#f6f1fa;border-radius:14px" alt="'+esc(p.name)+'">':placeholder)+'<p class="subtle">'+esc(catName(p.category_id))+' — '+esc(brandName(p.brand_id))+'</p><h3 class="cost">'+money(p.price_iqd)+'</h3><p style="line-height:1.9;white-space:pre-wrap">'+esc(p.description||"لا يوجد وصف إضافي حالياً")+'</p><p class="subtle">المتوفر: '+p.stock+'</p><button class="btn primary" id="detailAdd" '+(p.stock<1?"disabled":"")+'>إضافة للعربة</button></div>');$("#detailAdd").onclick=()=>{add(p.id);closeModal()}}
+function add(id){const p=state.products.find(x=>x.id===id);if(!p||p.stock<=0)return notify("المنتج غير متوفر");const qty=Number(state.cart[id]||0);if(qty>=p.stock)return notify("وصلت للكمية المتوفرة بالمخزون");state.cart[id]=Math.min(99,qty+1);persist();notify("تمت إضافة المنتج للعربة ✅")}
+function updateQty(id,delta){const p=state.products.find(x=>x.id===id);if(!p)return;const qty=Number(state.cart[id]||0)+delta;if(qty<=0)delete state.cart[id];else state.cart[id]=Math.min(qty,p.stock,99);persist();render()}
+function toggleFav(id){state.favs=state.favs.includes(id)?state.favs.filter(x=>x!==id):[...state.favs,id];persist();render()}
+function authMode(mode){const f=$("#authForm");if(!f)return;f.elements.mode.value=mode;f.querySelector("button[type=submit]").textContent=mode==="signup"?"إنشاء حساب":"دخول";f.querySelector("input[name=password]").autocomplete=mode==="signup"?"new-password":"current-password";document.querySelectorAll("[data-auth-mode]").forEach(x=>x.classList.toggle("active",x.dataset.authMode===mode));}
+async function loadCatalog(){
+ const [cats,brands,products,rates,promos]=await Promise.all([
+ sb.from("categories").select("*").order("sort_order"),
+ sb.from("brands").select("*").order("name"),
+ sb.from("products").select("*").order("created_at",{ascending:false}),
+ sb.from("shipping_rates").select("*").order("governorate"),
+ sb.from("promotions").select("*").order("sort_order")
+ ]);
+ for(const res of [cats,brands,products,rates,promos])if(res.error)console.error("BAZOO catalog query:",res.error.message);
+ state.categories=cats.data||[];state.brands=brands.data||[];state.products=products.data||[];state.rates=rates.data||[];state.promos=promos.data||[];
+}
+async function checkAdmin(){if(!state.user){state.admin=false;return}const {data,error}=await sb.from("admin_members").select("user_id").eq("user_id",state.user.id).maybeSingle();state.admin=!error&&!!data}
+async function authSubmit(f){
+ const data=new FormData(f),email=data.get("email").trim(),password=data.get("password"),mode=data.get("mode");
+ const button=f.querySelector("button[type=submit]");button.disabled=true;
+ try{const res=mode==="signup"?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});if(res.error)throw res.error;
+ if(mode==="signup"&&!res.data.session){$("#authMessage").textContent="انرسل رابط تأكيد للبريد الإلكتروني. فعّل حسابك من الإيميل، وبعدها سجّل دخول.";return}
+ notify(mode==="signup"?"تم إنشاء الحساب":"تم تسجيل الدخول");
+ await refreshAuth();go(state.checkoutPending?"checkout":"account");
+ }catch(e){$("#authMessage").textContent="تعذر الدخول: "+e.message}finally{button.disabled=false}
+}
+async function refreshAuth(){const {data}=await sb.auth.getUser();state.user=data?.user||null;await checkAdmin()}
+async function submitOrder(f){
+ const d=new FormData(f),p=String(d.get("phone")).trim();
+ if(!/^07[0-9]{9}$/.test(p))return notify("رقم الهاتف لازم يكون 11 رقم ويبدأ بـ 07");
+ const governorate=String(d.get("governorate"));if(!state.rates.some(x=>x.governorate===governorate&&x.enabled))return notify("التوصيل غير متوفر لهذه المحافظة حالياً");
+ const items=cartEntries().map(({p,qty})=>({id:p.id,quantity:qty}));if(!items.length)return notify("العربة فارغة");
+ const btn=f.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="جارٍ حفظ الطلب...";
+ const {data,error}=await sb.rpc("place_order",{p_items:items,p_name:d.get("customer_name"),p_phone:p,p_governorate:governorate,p_address:d.get("address"),p_note:d.get("note")||"",p_payment_method:d.get("payment")});
+ btn.disabled=false;btn.textContent="تأكيد الطلب وحفظه ←";
+ if(error){notify("ما تم حفظ الطلب: "+error.message);await loadCatalog();return}
+ state.cart={};state.checkoutPending=false;persist();await loadCatalog();notify("تم حفظ طلبك بنجاح ✅");go("account");openModal("تم تأكيد طلبك ✅",'<p>استلمنا طلبك داخل النظام بنجاح.</p><p>رقم الطلب: <strong>'+esc(data)+'</strong></p><p class="subtle">تگدر تتابع حالة الطلب من صفحة حسابك. إذا اخترت التنسيق عبر واتساب، راح تحتاج تتواصل ويا المتجر بعد إضافة رقم التواصل الرسمي.</p><button class="btn primary" id="doneOrder">مشاهدة طلباتي</button>');$("#doneOrder").onclick=closeModal;
+}
+function shippingBind(sel,ship,total){
+ const s=$(sel);if(!s)return;s.addEventListener("change",()=>{const rate=state.rates.find(x=>x.governorate===s.value&&x.enabled);$(ship).textContent=rate?money(rate.price_iqd):"اختر محافظة متاحة";$(total).textContent=rate?money(subtotal()+rate.price_iqd):money(subtotal())+" + التوصيل"});
+}
+async function render(){
+ const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
+ document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
+ let content="";
+ if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
+ if(state.route!==route)return;$("#app").innerHTML=content;
+ if(route==="cart")shippingBind("#cartGovernorate","#shippingPrice","#grandTotal");
+ if(route==="checkout")shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal");
+ if(route==="admin")bindAdmin();
+}
+document.addEventListener("click",async e=>{
+ const b=e.target.closest("button,[data-detail]");if(!b)return;
+ if(b.dataset.go){go(b.dataset.go);return}
+ if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories");return}
+ if(b.dataset.add){add(b.dataset.add);return}
+ if(b.dataset.detail){detail(b.dataset.detail);return}
+ if(b.dataset.fav){toggleFav(b.dataset.fav);return}
+ if(b.dataset.qty){updateQty(b.dataset.qty,Number(b.dataset.step));return}
+ if(b.dataset.remove){delete state.cart[b.dataset.remove];persist();render();return}
+ if(b.dataset.slide){state.promoIndex=Math.max(0,state.promoIndex+Number(b.dataset.slide));render();return}
+ if(b.dataset.authMode){authMode(b.dataset.authMode);return}
+ if(b.id==="toCheckout"){if(!$("#cartGovernorate").value)return notify("اختار المحافظة حتى نحسب التوصيل");go("checkout");const g=$("#orderGovernorate");if(g){g.value=$("#cartGovernorate")?.value||"";g.dispatchEvent(new Event("change"))}return}
+ if(b.id==="resetPassword"){const email=$('#authForm input[name="email"]')?.value.trim();if(!email)return notify("اكتب البريد الإلكتروني أولاً");const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#/account"});notify(error?error.message:"إذا البريد مسجل، راح توصلك رسالة إعادة تعيين كلمة المرور");return}
+ if(b.id==="signOut"){await sb.auth.signOut();state.user=null;state.admin=false;notify("تم تسجيل الخروج");go("home");return}
+ if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;render();return}
+ if(b.dataset.editProduct){state.editProduct=b.dataset.editProduct;render();return}
+ if(b.id==="newProduct"){state.editProduct="new";render();return}
+ if(b.dataset.editPromo){showPromoEditor(b.dataset.editPromo);return}
+ if(b.id==="newPromo"){showPromoEditor("new");return}
+});
+document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.category=e.target.value;render()}if(e.target.id==="brandFilter"){state.brand=e.target.value;render()}});
+let searchDebounce;document.addEventListener("input",e=>{if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
+document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm"].includes(id))return;e.preventDefault();if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target)});
+$("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#year").textContent=new Date().getFullYear();
+document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
+window.addEventListener("hashchange",render);
+sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(async()=>{await refreshAuth();if(["account","admin","checkout"].includes(state.route))render()},0)}});
+await refreshAuth();await loadCatalog();persist();render();
