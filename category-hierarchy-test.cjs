@@ -9,14 +9,14 @@ assert.match(app,/function activeCategoriesOnHome\(/,"homepage categories must b
 assert.match(app,/function categoryPhoto\(/,"uploaded category covers or safe fallback should be shown");
 assert.match(app,/show_on_home!==false/,"homepage visibility must be configurable per category");
 assert.match(app,/category-photo-grid/,"homepage category image grid missing");
-assert.match(app,/href="\'+\(c\.id\?'#\/categories\//,"every tile needs a direct link to its filtered category");
+assert.match(app,/#\/categories\/'\+encodeURIComponent\(c\.id\)/,"every tile needs a direct link to its filtered category");
 assert.match(app,/function descendantIds\(/,"nested categories must resolve their descendant product IDs");
 assert.match(app,/categoryChain\(p\.category_id\)/,"hidden ancestors must also hide nested products");
 assert.match(app,/if\(route==="categories"&&parts\[1\]\)/,"deep links must survive page reload");
 assert.match(app,/const matchCat=!category\|\|descendants\.has/,"product list must actually filter by category branch");
 assert.match(app,/category-child-links/,"category pages should show their subcategories");
 assert.match(admin,/name="categoryPhoto"/,"admin must allow uploading a real category cover");
-assert.match(admin,/name="show_on_home"/,"admin category editor should have a homepage visibility control");
+assert.match(admin,/booleanSelect\("إظهاره في الصفحة الرئيسية","show_on_home"/,"admin category editor should have a homepage visibility control");
 assert.match(admin,/categories",15360,650,650/,"category photo uploads must be compressed");
 assert.match(admin,/function categoryAncestors\(/,"category parent choices must form a hierarchy");
 assert.match(admin,/categoryAncestors\(parent,rows\)/,"editor must reject circular category links");
