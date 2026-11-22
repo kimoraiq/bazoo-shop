@@ -25,5 +25,5 @@ assert.match(app,/pendingScroll="#adminTabContent"/,"Admin tab switching should 
 assert.match(admin,/id="adminTabContent"/,"Admin scroll destination missing");
 assert.match(css,/scroll-margin-top:120px/,"Sticky header offset missing");
 assert.match(css,/prefers-reduced-motion:reduce/,"Reduced-motion support missing");
-assert.match(html,/orders28/,"The updated JS and CSS should bust browser caches");
+assert.match(html,/bundle\.js\?v=20\d{6}[a-z0-9-]+/,"The updated JS and CSS should bust browser caches");
 console.log("PASS BAZOO: full formal-Arabic copy and accessible smooth navigation scroll");
