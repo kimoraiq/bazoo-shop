@@ -126,7 +126,7 @@ function editor(p={}){
  +'<label class="formgroup fullspan">وصف المنتج<textarea name="description" class="field" rows="4">'+esc(p.description||"")+'</textarea></label>'
  +'<label class="formgroup fullspan">المواصفات <span class="form-help">اكتب كل مواصفة في سطر مستقل، مثال: اللون: أسود</span><textarea name="specifications" class="field" rows="4" placeholder="اللون: أسود&#10;الموديل: ...">'+esc(specs)+'</textarea></label>'
  +'<div class="fullspan image-editor"><div class="image-editor-heading">'+icon("image",22)+' <div><h3>صور المنتج</h3><p>تُضغط كل صورة تلقائياً إلى 15 كيلوبايت أو أقل قبل رفعها.</p></div></div>'
- +'<div class="main-photo-editor"><div class="main-photo-heading"><strong>'+icon("image",18)+' الصورة الرئيسية للمنتج *</strong><small>ارفع الصورة مباشرةً من جهازك بدلاً من إدخال رابط. يمكنك استبدالها في أي وقت.</small></div>'
+ +'<div class="main-photo-editor"><div class="main-photo-heading"><strong>'+icon("image",18)+' الصورة الرئيسية للمنتج</strong><small>يمكن رفع صورة رئيسية من جهازك أو استبدالها لاحقاً؛ ولن يمنع غياب الصورة حفظ بيانات المنتج أو خصمه.</small></div>'
  +'<div class="main-photo-preview" id="mainPhotoPreview">'+(safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="الصورة الرئيسية الحالية"><span class="media-existing-label">الصورة الحالية</span>':'<span class="empty-media-preview">'+icon("image",28)+' اختر الصورة الرئيسية</span>')+'</div>'
  +'<label class="main-photo-picker">'+icon("upload",17)+' <span>اختيار صورة رئيسية من الجهاز</span><input type="file" name="coverPhoto" accept="image/jpeg,image/png,image/webp" aria-label="اختيار الصورة الرئيسية للمنتج"></label></div>'
  +(p.id?gallery:'<p class="subtle">ستظهر الصور الإضافية هنا بعد حفظ المنتج.</p>')
@@ -136,7 +136,9 @@ function editor(p={}){
  +'<label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label>'
  +'<label class="formgroup">منتج مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
  +'<label class="formgroup">إظهار بصفحة العروض بدون خصم<select name="promoted_offer" class="field"><option value="false" '+(!standaloneOffer?'selected':'')+'>لا</option><option value="true" '+(standaloneOffer?'selected':'')+'>نعم</option></select></label>'
- +'<button type="submit" class="btn primary fullspan">'+icon("check",18)+' حفظ المنتج وصوره</button></form></div>';
+ +'<div id="productSaveStatus" class="product-save-status fullspan" role="status" aria-live="polite" hidden></div>'
+ +'<div class="product-save-actions fullspan"><button type="submit" class="btn primary">'+icon("check",18)+' حفظ المنتج</button>'
+ +(p.id?'<button type="button" id="saveDiscountOnly" class="btn outline">'+icon("percent",17)+' حفظ السعر والخصم فقط</button>':'')+'</div></form></div>';
 }
 
 const staffScopes=[
@@ -277,6 +279,9 @@ document.querySelectorAll("[data-admin-img-up]").forEach(btn=>btn.onclick=async(
  await loadCatalog();notify("تم تغيير ترتيب الصور");render();
 });
 const f=document.querySelector("#adminProductForm");if(f){
+ const discountSave=f.querySelector("#saveDiscountOnly");
+ if(discountSave)discountSave.onclick=()=>saveDiscountOnly(f);
+
 const p=state.products.find(x=>x.id===state.editProduct);
 if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){if(f.elements[key])f.elements[key].value=String(p[key]??"")}
  const originalInput=f.elements.original_price_iqd,discountInput=f.elements.discount_percent,previewRoot=f.querySelector("#discountPreview");
@@ -312,6 +317,44 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
 }
 document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status);notify(error?error.message:"تم تحديث حالة الطلب ")});
 document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g);if(error)return notify(error.message);await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
+}
+function setProductSaveStatus(form,message,type="error"){
+ const box=form?.querySelector?.("#productSaveStatus");
+ if(box){
+  box.hidden=false;
+  box.className="product-save-status fullspan "+(type==="success"?"product-status-success":type==="warning"?"product-status-warning":"product-status-error");
+  box.textContent=message;
+  if(type!=="success")box.scrollIntoView?.({behavior:"smooth",block:"nearest"});
+ }
+ notify(message);
+}
+function getProductPriceInfo(form){
+ const original=form.elements.original_price_iqd?.value??"";
+ const percent=form.elements.discount_percent?.value??"";
+ const value=calculateDiscount(original,percent===""?0:percent);
+ if(!value)throw Error("تحقق من السعر الأصلي ونسبة الخصم (من 0% إلى 99%)، ويجب أن يكون السعر بعد الخصم أكبر من صفر.");
+ return value;
+}
+async function saveDiscountOnly(form){
+ const id=String(form.elements.id?.value||"");
+ if(!id)return setProductSaveStatus(form,"يرجى حفظ المنتج أولاً قبل تعديل الخصم بصورة مستقلة.");
+ const btn=form.querySelector("#saveDiscountOnly");
+ if(btn?.disabled)return;
+ if(btn)btn.disabled=true;
+ try{
+  const priceInfo=getProductPriceInfo(form);
+  const promotion=form.elements.promoted_offer?.value==="true";
+  const {data,error}=await sb.from("products").update({
+   price_iqd:priceInfo.price,
+   compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
+   on_sale:priceInfo.percentage>0||promotion
+  }).eq("id",id).select("*").single();
+  if(error||!data)throw Error(error?.message||"لم يُحفظ التعديل في قاعدة البيانات.");
+  await loadCatalog();
+  setProductSaveStatus(form,"تم حفظ السعر والخصم بنجاح.", "success");
+  state.editProduct=id;
+ }catch(err){setProductSaveStatus(form,"تعذّر حفظ الخصم: "+err.message);}
+ finally{if(btn)btn.disabled=false}
 }
 async function saveProduct(form){
  const f=new FormData(form),id=String(f.get("id")||"");
