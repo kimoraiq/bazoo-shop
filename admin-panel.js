@@ -187,10 +187,27 @@ function renderProducts(){
  +'<div class="section-head"><div><h2>إدارة المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><div class="section-tools"><label class="search-box">'+glyph("search")+'<input type="search" class="input" id="productSearch" placeholder="ابحث عن منتج أو رمز..." aria-label="بحث في المنتجات"></label><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div></div>'
  +table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
 }
+function categoryAncestors(category,list){
+ const result=[],visited=new Set([String(category.id)]);
+ let node=category;
+ for(let depth=0;node?.parent_id&&depth<12;depth++){
+  const parent=list.find(c=>String(c.id)===String(node.parent_id));
+  if(!parent||visited.has(String(parent.id)))break;
+  visited.add(String(parent.id));result.unshift(parent);node=parent;
+ }
+ return result;
+}
+function categoryPath(category,list){return [...categoryAncestors(category,list).map(c=>c.name),category.name].join(" / ")}
 function renderTaxonomy(tableName){
- const rows=state.records[tableName]||[],heading=SCOPE[tableName];
- return '<div class="section-head"><div><h2>'+heading+'</h2><p>إضافة وتعديل وتصنيف العناصر</p></div><button type="button" class="button" data-action="new" data-table="'+tableName+'">إضافة '+(tableName==="brands"?"علامة تجارية":"فئة")+'</button></div>'+
- table(["الاسم","المعرّف","الحالة","الإجراءات"],rows.map(p=>'<tr><td>'+html(p.name)+'</td><td>'+html(p.slug||"")+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"ظاهر":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit",tableName,p.id,"تعديل")+action("toggle",tableName,p.id,p.active?"إخفاء":"إظهار")+action("delete",tableName,p.id,"حذف","danger")+'</div></td></tr>').join("")||'<tr><td colspan="4">لا توجد عناصر.</td></tr>');
+ const rows=state.records[tableName]||[],heading=SCOPE[tableName],isCat=tableName==="categories";
+ const ordered=isCat?[...rows].sort((a,b)=>categoryPath(a,rows).localeCompare(categoryPath(b,rows),"ar")):rows;
+ const headings=isCat?["الصورة","التصنيف","القسم الرئيسي","الرئيسية","الحالة","الإجراءات"]:["الاسم","المعرّف","الحالة","الإجراءات"];
+ const body=ordered.map(p=>'<tr>'+(isCat?'<td>'+imageCell(p.image_url)+'</td>':"")+'<td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.slug||"")+'</div></td>'
+ +(isCat?'<td><span class="help">'+html(categoryAncestors(p,rows).map(x=>x.name).join(" / ")||"قسم رئيسي")+'</span></td><td><span class="tag '+(p.show_on_home?"":"off")+'">'+(p.show_on_home?"يظهر":"مخفي")+'</span></td>':"")
+ +'<td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"ظاهر":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit",tableName,p.id,"تعديل")+action("toggle",tableName,p.id,p.active?"إخفاء":"إظهار")+action("delete",tableName,p.id,"حذف","danger")+'</div></td></tr>').join("");
+ return '<div class="section-head"><div><h2>'+heading+'</h2><p>'+(isCat?"تصنيفات رئيسية وفرعية مترابطة مع صور الصفحة الرئيسية":"إضافة العلامات التجارية وتعديلها")+'</p></div><button type="button" class="button" data-action="new" data-table="'+tableName+'">'+glyph("plus")+'إضافة '+(tableName==="brands"?"علامة تجارية":"تصنيف")+'</button></div>'
+ +(isCat?'<div class="notice-line">اضغط على «تعديل» لرفع صورة دائرية، وتحديد القسم الرئيسي، وتفعيل ظهوره في الصفحة الرئيسية. سينتقل الزائر مباشرة إلى منتجات التصنيف.</div>':"")
+ +table(headings,body||'<tr><td colspan="'+headings.length+'">لا توجد عناصر بعد.</td></tr>');
 }
 function renderShipping(){
  const rows=state.records.shipping||[];
@@ -245,7 +262,8 @@ function showProduct(id){
  const original=p.compare_at_iqd>p.price_iqd?p.compare_at_iqd:(p.price_iqd??"");
  const percentage=p.compare_at_iqd>p.price_iqd?Math.round((p.compare_at_iqd-p.price_iqd)*100/p.compare_at_iqd):0;
  const spec=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications).map(x=>x[0]+": "+x[1]).join("\n"):"";
- const options=catalogOptions("categories").filter(([key])=>!key||(state.records.categories||[]).find(x=>String(x.id)===key)?.parent_id);
+ const options=catalogOptions("categories").filter(([key])=>!key||(state.records.categories||[]).find(x=>String(x.id)===key)?.parent_id)
+   .map(([key,name])=>[key,key?categoryPath((state.records.categories||[]).find(x=>String(x.id)===key),state.records.categories||[]):name]);
  openDialog(id?"تعديل المنتج":"إضافة منتج",makeForm("productForm",
   sectionHeading("البيانات الأساسية","تعريف المنتج وتصنيفه","package")+
   field("اسم المنتج *","name",p.name||"",'required minlength="2" maxlength="180"')+
@@ -273,13 +291,18 @@ function showProduct(id){
 function showTaxonomy(table,id){
  const p=id?findRecord(table,id):{};
  const cat=table==="categories";
- const main=cat?selectField("الفئة الرئيسية","parent_id",[["","فئة رئيسية"],...(state.records.categories||[]).filter(x=>!x.parent_id&&String(x.id)!==String(p.id)).map(x=>[String(x.id),x.name])],p.parent_id):"";
+ const rows=state.records.categories||[];
+ const eligible=rows.filter(x=>String(x.id)!==String(p.id)&&!categoryAncestors(x,rows).some(a=>String(a.id)===String(p.id)));
+ const main=cat?selectField("يتبع إلى التصنيف الرئيسي","parent_id",[["","قسم رئيسي مستقل"],...eligible.map(x=>[String(x.id),categoryPath(x,rows)])],p.parent_id):"";
  openDialog(id?"تعديل "+SCOPE[table]:"إضافة "+SCOPE[table],makeForm("taxonomyForm",
- sectionHeading("بيانات "+SCOPE[table],"اسم واضح ومعرّف فريد","grid")+
+ sectionHeading("بيانات "+SCOPE[table],"تنظيم القسم وعلاقته بالأقسام الأخرى","grid")+
  field("الاسم *","name",p.name||"",'required minlength="2" maxlength="100"')+
  field("المعرّف بالإنجليزية","slug",p.slug||"",'pattern="[a-z0-9-]*"')+main+
- (cat?field("الترتيب","sort_order",p.sort_order||0,'type="number" min="0"'): "")+
- booleanSelect("ظاهر","active",p.active!==false)+
+ (cat?field("ترتيب الظهور","sort_order",p.sort_order??0,'type="number" min="0"'): "")+
+ booleanSelect("ظاهر في المتجر","active",p.active!==false)+
+ (cat?booleanSelect("إظهاره في الصفحة الرئيسية","show_on_home",p.show_on_home!==false):"")+
+ (cat?sectionHeading("صورة التصنيف","تظهر داخل دائرة على الصفحة الرئيسية","image")+
+ '<label class="field file-picker full"><span>صورة التصنيف (PNG / JPEG / WEBP)</span><span class="file-preview category-cover-preview" data-file-preview="categoryPhoto">'+(p.image_url&&safeUrl(p.image_url)?'<img src="'+safeUrl(p.image_url)+'" alt="صورة التصنيف الحالية">':glyph("image")+'<small>اختر صورة واضحة للمنتج أو القسم</small>')+'</span><input name="categoryPhoto" class="input" type="file" accept="image/png,image/jpeg,image/webp"><span class="upload-hint">تُرفع مباشرة من جهازك وتُضغط تلقائياً إلى 15 كيلوبايت.</span></label>':"")+
  '<input type="hidden" name="id" value="'+html(p.id||"")+'"><input type="hidden" name="table" value="'+table+'">'+formFooter()
  ),table+":"+String(p.id||"new"));
 }
@@ -413,9 +436,23 @@ async function saveTaxonomy(form){
  const slug=String(f.get("slug")||"").trim()||"bazoo-"+Date.now();
  if(!/^[a-z0-9-]+$/.test(slug))throw Error("المعرّف يجب أن يحتوي حروفاً إنجليزية صغيرة وأرقاماً وشرطة فقط.");
  const record={name,slug,active:f.get("active")==="true"};
- if(table==="categories"){record.parent_id=f.get("parent_id")?numeric(f.get("parent_id"),"الأب"):null;record.sort_order=numeric(f.get("sort_order")||0,"الترتيب");}
+ if(table==="categories"){
+  const rows=state.records.categories||[];
+  const parentId=f.get("parent_id")?numeric(f.get("parent_id"),"القسم الرئيسي"):null;
+  if(parentId){
+   const parent=rows.find(x=>String(x.id)===String(parentId));
+   if(!parent)throw Error("التصنيف الرئيسي غير موجود.");
+   if(String(parentId)===String(id)||categoryAncestors(parent,rows).some(x=>String(x.id)===String(id)))throw Error("لا يمكن ربط تصنيف بنفسه أو بأحد تصنيفاته الفرعية.");
+  }
+  record.parent_id=parentId;
+  record.sort_order=numeric(f.get("sort_order")||0,"الترتيب");
+  record.show_on_home=f.get("show_on_home")==="true";
+  record.image_url=id?findRecord("categories",id).image_url||null:null;
+  const image=form.querySelector('[name="categoryPhoto"]')?.files?.[0];
+  if(image)record.image_url=await upload(image,"product-images","categories",15360,650,650);
+ }
  await requestSave(table,record,id);
- return "تم حفظ "+SCOPE[table]+" والتحقق منها.";
+ return table==="categories"?"تم حفظ التصنيف وربطه بالقسم الصحيح وظهوره في المتجر.":"تم حفظ العلامة التجارية والتحقق منها.";
 }
 async function savePromo(form){
  const f=new FormData(form),id=String(f.get("id")||"");
