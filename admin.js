@@ -54,15 +54,25 @@ await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج ");r
 }
 function showPromoEditor(id){
 const p=state.promos.find(x=>x.id===id)||{};
-openModal(p.id?"تعديل الإعلان":"إعلان جديد",'<form id="adminPromoForm" class="stack"><input type="hidden" name="id" value="'+esc(p.id||"")+'"><label class="formgroup">عنوان الإعلان<input name="title" class="field" required value="'+esc(p.title||"")+'"></label><label class="formgroup">تفاصيل<input name="subtitle" class="field" value="'+esc(p.subtitle||"")+'"></label><label class="formgroup">رابط صورة HTTPS<input name="image_url" class="field" value="'+esc(p.image_url||"")+'"></label><label class="formgroup">رابط داخلي مثل #/offers<input name="link_url" class="field" value="'+esc(p.link_url||"")+'"></label><label class="formgroup">المكان<select name="placement" class="field"><option value="home">الرئيسية</option><option value="categories">الفئات</option><option value="cart">العربة</option></select></label><label class="formgroup">الحالة<select name="active" class="field"><option value="true">مفعّل</option><option value="false">مخفي</option></select></label><button class="btn primary">حفظ</button></form>');
-const form=document.querySelector("#adminPromoForm");if(p.id){form.elements.placement.value=p.placement;form.elements.active.value=String(p.active)}
+openModal(p.id?"تعديل الإعلان":"إعلان جديد",'<form id="adminPromoForm" class="stack"><input type="hidden" name="id" value="'+esc(p.id||"")+'"><label class="formgroup">عنوان الإعلان<input name="title" class="field" required value="'+esc(p.title||"")+'"></label><label class="formgroup">تفاصيل<input name="subtitle" class="field" value="'+esc(p.subtitle||"")+'"></label><label class="formgroup">رابط صورة HTTPS<input name="image_url" class="field" value="'+esc(p.image_url||"")+'"></label><label class="formgroup">رابط داخلي مثل #/offers<input name="link_url" class="field" value="'+esc(p.link_url||"")+'"></label><label class="formgroup">المكان<select name="placement" class="field"><option value="home">الرئيسية</option><option value="categories">الفئات</option><option value="cart">العربة</option></select></label><label class="formgroup">الحالة<select name="active" class="field"><option value="true">مفعّل</option><option value="false">مخفي</option></select></label><label class="formgroup">نوع الإعلان<select name="is_demo" class="field"><option value="false">إعلان حقيقي</option><option value="true">نموذج توضيحي</option></select></label><label class="formgroup">ترتيب الظهور<input type="number" name="sort_order" class="field" min="0" max="9999" value="'+esc(p.sort_order??0)+'"></label><label class="formgroup">رفع صورة للبنر<input type="file" name="photo" class="field" accept="image/png,image/jpeg,image/webp"></label><button class="btn primary">حفظ</button></form>');
+const form=document.querySelector("#adminPromoForm");if(p.id){form.elements.placement.value=p.placement;form.elements.active.value=String(p.active);form.elements.is_demo.value=String(p.is_demo||false)}
 }
 async function savePromo(form){
-const f=new FormData(form),id=f.get("id");const v={title:String(f.get("title")).trim(),subtitle:String(f.get("subtitle")||""),image_url:String(f.get("image_url")||"").trim()||null,link_url:String(f.get("link_url")||"").trim()||null,placement:f.get("placement"),active:f.get("active")==="true"};
+const f=new FormData(form),id=f.get("id");const v={title:String(f.get("title")).trim(),subtitle:String(f.get("subtitle")||""),image_url:String(f.get("image_url")||"").trim()||null,link_url:String(f.get("link_url")||"").trim()||null,placement:f.get("placement"),active:f.get("active")==="true",is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
 if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("رابط الصورة لازم HTTPS");
 if(v.link_url&&!/^#\/(home|categories|offers|cart)$/.test(v.link_url))return notify("الرابط يجب يكون داخلي");
+try{
+const photo=f.get("photo");
+if(photo?.size){
+ if(photo.size>5*1024*1024||!["image/png","image/jpeg","image/webp"].includes(photo.type))throw Error("الصورة غير مدعومة أو أكبر من 5MB");
+ const ext={"image/png":"png","image/jpeg":"jpg","image/webp":"webp"}[photo.type],name="promotions/"+crypto.randomUUID()+"."+ext;
+ const uploaded=await sb.storage.from("product-images").upload(name,photo,{contentType:photo.type});
+ if(uploaded.error)throw Error(uploaded.error.message);
+ v.image_url=sb.storage.from("product-images").getPublicUrl(name).data.publicUrl;
+}
 const r=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);if(r.error)return notify(r.error.message);
 closeModal();await loadCatalog();notify("تم حفظ الإعلان ");render();
+}catch(error){notify("تعذّر رفع الإعلان: "+error.message)}
 }
 
 async function toggleRecord(table,id){
