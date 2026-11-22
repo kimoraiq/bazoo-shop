@@ -3,12 +3,13 @@ const vm=require("node:vm");
 const assert=require("node:assert/strict");
 const source=fs.readFileSync("bundle.js","utf8");
 const html=fs.readFileSync("index.html","utf8");
+const css=fs.readFileSync("style.css","utf8");
 const nodes=new Map(), handlers=new Map(), data=new Map();
 function node(key){
  if(!nodes.has(key))nodes.set(key,{
   innerHTML:key==="#app"?"جاري تحميل متجر بازو...":"",
   textContent:"",value:"",hidden:false,dataset:{},style:{},
-  classList:{add(){},remove(){},toggle(){}},
+  classList:{add(){},remove(){},toggle(){},contains(){return false}},
   addEventListener(){},dispatchEvent(){},getAttribute(){return null},
   querySelector(){return node(".test-field")},
   querySelectorAll(){return []},
@@ -38,6 +39,12 @@ const context={
  assert.match(node("#app").innerHTML,/home-categories/,"category circles missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
  assert.match(html,/بكل أنحاء العراق/,"delivery wording missing");
+ assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
+ assert.match(css,/\.merch-slider\{height:470px/,"mobile banner must have a fixed height");
+ assert.match(source,/function confirmAction\(/,"branded confirmation dialog missing");
+ assert.match(source,/function removeRecord\(/,"admin product and promo deletion missing");
+ assert.match(source,/demo-price-note/,"demo price labels missing");
+ assert.doesNotMatch(source,/\b(window\.)?(alert|prompt|confirm)\s*\(/,"no native browser popup APIs allowed");
  assert.equal(typeof node("#accountBtn").onclick,"function","header login action not bound");
  node("#accountBtn").onclick();
  await context.render();
