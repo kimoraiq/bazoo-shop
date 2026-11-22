@@ -234,6 +234,27 @@ if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" sty
 return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
 function bindAdmin(){
+ // Bind admin actions directly to their visible buttons, rather than relying
+ // solely on the storefront's generic delegated navigation handler.
+ document.querySelectorAll("[data-admin-tab]").forEach(b=>b.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab=b.dataset.adminTab;
+  state.editProduct=null;
+  render();
+ });
+ document.querySelectorAll("[data-edit-product]").forEach(b=>b.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab="products";
+  state.editProduct=b.dataset.editProduct;
+  render();
+ });
+ const addProduct=document.querySelector("#newProduct");
+ if(addProduct)addProduct.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab="products";
+  state.editProduct="new";
+  render();
+ };
 const addMember=document.querySelector("#addStaffMember");if(addMember)addMember.onclick=()=>memberEditor();
 document.querySelectorAll("[data-staff-edit]").forEach(b=>b.onclick=()=>memberEditor(b.dataset.staffEdit));
 document.querySelectorAll("[data-staff-remove]").forEach(b=>b.onclick=()=>revokeMember(b.dataset.staffRemove));
