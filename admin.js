@@ -1,17 +1,32 @@
 export function createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction}){
 const brandOpts=()=>state.brands.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
 const catOpts=()=>state.categories.filter(x=>x.parent_id).map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
+function calculateDiscount(original,percent){
+ const base=Number(original),pct=Number(percent);
+ if(!Number.isSafeInteger(base)||base<0||base>2000000000||!Number.isInteger(pct)||pct<0||pct>99)return null;
+ const finalPrice=Math.round(base*(100-pct)/100);
+ if(pct>0&&(base<1||finalPrice<1||finalPrice>=base))return null;
+ return {original:base,percentage:pct,price:finalPrice,saved:base-finalPrice};
+}
 function editor(p={}){
  const existing=state.productImages.filter(x=>x.product_id===p.id).sort((a,b)=>a.sort_order-b.sort_order);
  const specs=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications).map(([a,b])=>a+": "+b).join("\n"):"";
+ const hadDiscount=Number(p.compare_at_iqd)>Number(p.price_iqd);
+ const original=hadDiscount?p.compare_at_iqd:(p.price_iqd??"");
+ const percent=hadDiscount?Math.round((Number(p.compare_at_iqd)-Number(p.price_iqd))*100/Number(p.compare_at_iqd)):0;
+ const standaloneOffer=p.on_sale&&!hadDiscount;
  const gallery=existing.length?'<div class="admin-gallery-grid">'+existing.map((x,i)=>'<div class="admin-gallery-photo"><img src="'+safeImg(x.image_url)+'" alt="'+esc(x.alt_text||p.name)+'"><div class="admin-gallery-actions"><button type="button" data-admin-cover="'+x.id+'" title="اجعلها الصورة الرئيسية">'+icon("star",15)+'</button><button type="button" data-admin-img-up="'+x.id+'" '+(i===0?"disabled":"")+' title="تقديم الصورة">'+icon("chevron-right",15)+'</button><button type="button" data-admin-img-delete="'+x.id+'" class="danger-action" title="حذف الصورة">'+icon("x",15)+'</button></div>'+(p.image_url===x.image_url?'<small class="cover-label">الرئيسية</small>':'')+'</div>').join("")+'</div>':'<p class="subtle">ماكو صور إضافية بعد. ارفع صور المنتج حتى تظهر بمعرض التفاصيل.</p>';
  return '<div class="card admin-editor"><div class="row"><div><div class="kicker">إدارة المنتجات</div><h2>'+(p.id?"تعديل المنتج":"منتج جديد")+'</h2></div><button id="cancelEdit" class="btn outline">'+icon("arrow-right",17)+' رجوع</button></div>'
  +'<form id="adminProductForm" class="formgrid" novalidate><input type="hidden" name="id" value="'+esc(p.id||"")+'">'
  +'<label class="formgroup fullspan">اسم المنتج *<input name="name" required minlength="2" maxlength="180" class="field" value="'+esc(p.name||"")+'"></label>'
  +'<label class="formgroup">القسم *<select name="category_id" class="field" required><option value="">اختر القسم</option>'+catOpts()+'</select></label>'
  +'<label class="formgroup">العلامة التجارية<select name="brand_id" class="field"><option value="">بدون علامة</option>'+brandOpts()+'</select></label>'
- +'<label class="formgroup">السعر بالدينار *<input type="number" name="price_iqd" min="0" step="1" required class="field" value="'+esc(p.price_iqd??"")+'"></label>'
- +'<label class="formgroup">السعر السابق<input type="number" name="compare_at_iqd" min="0" step="1" class="field" value="'+esc(p.compare_at_iqd??"")+'"></label>'
+ +'<div class="discount-editor fullspan"><div class="discount-editor-title">'+icon("percent",19)+' <div><strong>السعر والخصم</strong><small>أدخل السعر الأصلي ونسبة الخصم، والسعر الجديد ينحسب تلقائياً.</small></div></div>'
+ +'<div class="discount-fields">'
+ +'<label class="formgroup">السعر الأصلي بالدينار *<input type="number" name="original_price_iqd" id="originalPriceInput" min="0" max="2000000000" step="1" required class="field" value="'+esc(original)+'" placeholder="مثلاً 100000"></label>'
+ +'<label class="formgroup">نسبة الخصم %<input type="number" name="discount_percent" id="discountPercentInput" min="0" max="99" step="1" class="field" value="'+esc(percent)+'" placeholder="مثلاً 20"></label></div>'
+ +'<div class="discount-preview" id="discountPreview" role="status" aria-live="polite"></div>'
+ +'<p class="discount-helper">إذا تريد السعر بدون تخفيض، خلّي الخصم 0%. الخصم ينسحب تلقائياً على سعر المتجر والعربة والطلب.</p></div>'
  +'<label class="formgroup">المخزون *<input type="number" name="stock" min="0" step="1" required class="field" value="'+esc(p.stock??0)+'"></label>'
  +'<label class="formgroup">رمز المنتج SKU<input name="sku" class="field" value="'+esc(p.sku||"")+'"></label>'
  +'<label class="formgroup fullspan">وصف المنتج<textarea name="description" class="field" rows="4">'+esc(p.description||"")+'</textarea></label>'
@@ -23,7 +38,7 @@ function editor(p={}){
  +'<label class="formgroup">نوع المنتج<select name="is_demo" class="field"><option value="false">منتج قابل للطلب</option><option value="true">نموذج للعرض فقط</option></select></label>'
  +'<label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label>'
  +'<label class="formgroup">منتج مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
- +'<label class="formgroup">عرض خاص<select name="on_sale" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
+ +'<label class="formgroup">إظهار بصفحة العروض بدون خصم<select name="promoted_offer" class="field"><option value="false" '+(!standaloneOffer?'selected':'')+'>لا</option><option value="true" '+(standaloneOffer?'selected':'')+'>نعم</option></select></label>'
  +'<button type="submit" class="btn primary fullspan">'+icon("check",18)+' حفظ المنتج وصوره</button></form></div>';
 }
 
@@ -166,7 +181,19 @@ document.querySelectorAll("[data-admin-img-up]").forEach(btn=>btn.onclick=async(
 });
 const f=document.querySelector("#adminProductForm");if(f){
 const p=state.products.find(x=>x.id===state.editProduct);
-if(p)for(const key of ["category_id","brand_id","active","featured","on_sale","is_demo"]){if(f.elements[key])f.elements[key].value=String(p[key]??"")}
+if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){if(f.elements[key])f.elements[key].value=String(p[key]??"")}
+ const originalInput=f.elements.original_price_iqd,discountInput=f.elements.discount_percent,previewRoot=f.querySelector("#discountPreview");
+ const updateDiscountPreview=()=>{
+  if(!previewRoot)return;
+  if(!originalInput.value.trim()){previewRoot.innerHTML='<span class="discount-preview-empty">اكتب السعر الأصلي حتى تشوف سعر البيع النهائي.</span>';return}
+  const calculated=calculateDiscount(originalInput.value,discountInput.value||0);
+  if(!calculated){previewRoot.innerHTML='<span class="discount-preview-error">راجع السعر ونسبة الخصم. الخصم لازم يكون من 0 إلى 99% والسعر النهائي أكبر من صفر.</span>';return}
+  previewRoot.innerHTML='<div class="discount-preview-prices"><span>سعر البيع بعد الخصم</span><strong>'+money(calculated.price)+'</strong></div>'
+    +(calculated.percentage?'<div class="discount-preview-saving"><del>'+money(calculated.original)+'</del><span class="discount-preview-tag">خصم '+calculated.percentage+'%</span><small>وفّر '+money(calculated.saved)+'</small></div>':'<small>ماكو خصم على هذا المنتج</small>');
+ };
+ originalInput.addEventListener("input",updateDiscountPreview);
+ discountInput.addEventListener("input",updateDiscountPreview);
+ updateDiscountPreview();
  const uploader=f.elements.photos;
  if(uploader)uploader.addEventListener("change",()=>{
   const root=document.querySelector("#photoUploadPreview");if(!root)return;
@@ -183,6 +210,8 @@ document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const 
 }
 async function saveProduct(form){
  const f=new FormData(form),id=String(f.get("id")||"");
+ const priceInfo=calculateDiscount(f.get("original_price_iqd"),f.get("discount_percent")||0);
+ if(!priceInfo)return notify("تحقق من السعر الأصلي ونسبة الخصم. لازم السعر النهائي يكون أكبر من صفر والتخفيض بين 0 و99%.");
  const specs={};
  for(const line of String(f.get("specifications")||"").split("\n")){
   const i=line.indexOf(":");if(i<1)continue;
@@ -191,12 +220,12 @@ async function saveProduct(form){
  }
  const v={name:String(f.get("name")).trim(),category_id:Number(f.get("category_id")),
   brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
-  price_iqd:Number(f.get("price_iqd")),compare_at_iqd:f.get("compare_at_iqd")!==""?Number(f.get("compare_at_iqd")):null,
+  price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
   stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,
   description:String(f.get("description")||""),specifications:specs,
   image_url:String(f.get("image_url")||"").trim()||null,
   active:f.get("active")==="true",featured:f.get("featured")==="true",
-  on_sale:f.get("on_sale")==="true",is_demo:f.get("is_demo")==="true"};
+  on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",is_demo:f.get("is_demo")==="true"};
  if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
  if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("رابط الصورة لازم يكون HTTPS");
  const photos=Array.from(form.elements.photos.files||[]);
