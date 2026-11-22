@@ -76,6 +76,7 @@ function scrollToContent(selector="#app"){
  else window.scrollTo?.({top:0,behavior:reduced?"auto":"smooth"});
 }
 function go(route,target="#app"){
+ if(route==="admin"){window.location.assign("./admin.html");return}
  pendingScroll=target;
  const next="#/"+route;
  if(location.hash!==next)location.hash=next;
@@ -440,6 +441,7 @@ function shippingBind(sel,ship,total){
 const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy,saveMember}=createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction});
 async function render(){
  const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
+ if(route==="admin"){window.location.replace("./admin.html");return;}
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  document.querySelectorAll("#categoryNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  let content="";
