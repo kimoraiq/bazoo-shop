@@ -20,7 +20,13 @@ const state={admin:true,adminRole:"owner",adminTab:"orders",adminPermissions:{},
 const updates=[],notices=[];let renders=0;
 const sb={from(table){
  return {
-  select(){return {order(){return {limit(){return Promise.resolve({data:[order],error:null})}}}}},
+  select(fields){
+   if(fields==="*")return {
+    eq(column,value){this.id=value;return this},
+    async single(){return {data:table==="orders"?{...order}: {...order.order_items.find(it=>String(it.id)===String(this.id))},error:null}}
+   };
+   return {order(){return {limit(){return Promise.resolve({data:[order],error:null})}}}};
+  },
   update(payload){
    return {eq(column,value){
     if(column==="id"||column==="order_id")return this;
