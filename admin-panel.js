@@ -124,7 +124,15 @@ async function reload(){
  try{
   if(!state.adminVerified)throw Error("لم يتم التحقق من صلاحية المسؤول.");
   const tab=state.tab;
-  if(tab==="products"){const [products,categories,brands,images]=await Promise.all([read("products","created_at"),read("categories","sort_order"),read("brands","name"),read("product_images","sort_order")]);Object.assign(state.records,{products,categories,brands,images});}
+  if(tab==="overview"){
+    const [p,o,ad]=await Promise.all([
+     can("products")?read("products","created_at"):Promise.resolve([]),
+     can("orders")?read("orders","created_at"):Promise.resolve([]),
+     can("promos")?read("promotions","sort_order"):Promise.resolve([])
+    ]);
+    state.records.overview={products:p,orders:o,promos:ad};
+  }
+  else if(tab==="products"){const [products,categories,brands,images]=await Promise.all([read("products","created_at"),read("categories","sort_order"),read("brands","name"),read("product_images","sort_order")]);Object.assign(state.records,{products,categories,brands,images});}
   else if(tab==="orders"){
    const {data,error}=await db.from("orders").select("*,order_items(*)").order("created_at",{ascending:false}).limit(150);
    if(error)throw Error(error.message);state.records.orders=data||[];
@@ -144,11 +152,40 @@ function productRows(){
  return (state.records.products||[]).map(p=>'<tr><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
 }
 function table(columns,body){return '<div class="surface table-wrap"><table class="data-table"><thead><tr>'+columns.map(x=>'<th>'+x+'</th>').join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>'}
+function statCard(label,num,ico,note=""){
+ return '<div class="stat"><div class="stat-head"><small>'+html(label)+'</small><span class="stat-icon">'+glyph(ico)+'</span></div><strong>'+html(String(num))+'</strong><div class="stat-foot">'+html(note)+'</div></div>';
+}
+function renderOverview(){
+ const data=state.records.overview||{},products=data.products||[],orders=data.orders||[],promos=data.promos||[];
+ const total=orders.filter(o=>o.status==="delivered").reduce((sum,o)=>sum+Number(o.total_iqd||0),0);
+ const items=[
+  can("products")?statCard("إجمالي المنتجات",products.length,"package","المنتجات المسجّلة"):null,
+  can("orders")?statCard("الطلبات الجديدة",orders.filter(o=>o.status==="new").length,"shopping-bag","تحتاج إلى المتابعة"):null,
+  can("orders")?statCard("طلبات تم تسليمها",orders.filter(o=>o.status==="delivered").length,"check-circle","طلبات مكتملة"):null,
+  can("promos")?statCard("إعلانات نشطة",promos.filter(p=>p.active).length,"sparkles","اللافتات المنشورة"):null
+ ].filter(Boolean).join("");
+ const links=[
+  ["products","إدارة المنتجات","الأسعار والمخزون والتفاصيل","package"],
+  ["orders","متابعة الطلبات","إتمام التجهيز والتوصيل","clipboard"],
+  ["promos","إدارة الإعلانات","اللافتات والعروض","sparkles"],
+  ["categories","تنظيم الفئات","الأقسام والفئات الفرعية","grid"],
+  ["shipping","إعدادات التوصيل","رسوم المحافظات","truck"],
+  ["members","صلاحيات المسؤولين","أعضاء فريق المتجر","user-round"]
+ ].filter(x=>x[0]==="members"?state.role==="owner":can(x[0]));
+ return '<div class="overview-welcome"><span class="overview-welcome-icon">'+glyph("sparkles")+'</span><div><strong>مرحباً بك في مركز إدارة بازو</strong><p>نظرة واحدة على المتجر، وكل ما تحتاج إليه لإدارته بكفاءة.</p></div></div>'
+ +'<div class="cards">'+(items||statCard("مساحة العمل","BAZOO","home","أهلاً بعودتك"))+'</div>'
+ +(can("orders")?'<div class="section-head"><div><h2>إجمالي المبيعات المسلّمة</h2><p>إجمالي قيمة الطلبات التي وصلت إلى حالة «تم التسليم»</p></div><span class="tag delivered">مكتملة</span></div><div class="surface overview-revenue"><strong>'+money(total)+'</strong><span>مبيعات الطلبات المكتملة فقط</span></div>':"")
+ +'<div class="section-head"><div><h2>اختصارات الإدارة</h2><p>انتقل مباشرة إلى القسم المطلوب</p></div></div>'
+ +'<div class="overview-actions">'+links.map(([key,label,desc,ico])=>'<button class="overview-link" type="button" data-tab="'+key+'"><span class="overview-link-icon">'+glyph(ico)+'</span><span><strong>'+label+'</strong><small>'+desc+'</small></span><span class="link-arrow">'+glyph("arrow-left")+'</span></button>').join("")+'</div>';
+}
 function renderProducts(){
  const rows=state.records.products||[];
- return '<div class="cards"><div class="stat"><small>عدد المنتجات</small><strong>'+rows.length+'</strong></div><div class="stat"><small>المنتجات المنشورة</small><strong>'+rows.filter(x=>x.active).length+'</strong></div><div class="stat"><small>المنتجات المخفية</small><strong>'+rows.filter(x=>!x.active).length+'</strong></div><div class="stat"><small>العروض الفعّالة</small><strong>'+rows.filter(x=>x.on_sale).length+'</strong></div></div>'+
- '<div class="section-head"><div><h2>إدارة المنتجات</h2><p>إضافة منتج أو تغيير السعر والخصم والصور والمخزون</p></div><button type="button" class="button" data-action="new" data-table="products">إضافة منتج</button></div>'+
- table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
+ return '<div class="cards">'+statCard("إجمالي المنتجات",rows.length,"package","كل المنتجات المسجلة")
+ +statCard("المنتجات المنشورة",rows.filter(x=>x.active).length,"check-circle","تظهر في المتجر")
+ +statCard("المنتجات المخفية",rows.filter(x=>!x.active).length,"eye-off","غير ظاهرة للعملاء")
+ +statCard("العروض الحالية",rows.filter(x=>x.on_sale).length,"percent","منتجات ضمن العروض")+'</div>'
+ +'<div class="section-head"><div><h2>كتالوج المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div>'
+ +table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
 }
 function renderTaxonomy(tableName){
  const rows=state.records[tableName]||[],heading=SCOPE[tableName];
@@ -186,7 +223,8 @@ function renderMembers(){
 function renderContent(){
  renderNav();title(SCOPE[state.tab]||"لوحة الإدارة");
  let body="";
- if(state.tab==="products")body=renderProducts();
+ if(state.tab==="overview")body=renderOverview();
+ else if(state.tab==="products")body=renderProducts();
  else if(state.tab==="orders")body=ordersRender();
  else if(state.tab==="shipping")body=renderShipping();
  else if(state.tab==="promos")body=renderPromos();
@@ -525,7 +563,12 @@ document.addEventListener("click",async event=>{
  if(!node)return;
  if(node.dataset.tab){
   if(!can(node.dataset.tab)&&node.dataset.tab!=="members")return alertUser("هذه الصلاحية غير مفعّلة.");
-  state.tab=node.dataset.tab;clearAlert();await reload();return;
+  state.tab=node.dataset.tab;
+  const sidebar=byId("adminSidebar"),backdrop=byId("sidebarBackdrop"),toggle=byId("menuToggle");
+  if(sidebar?.classList)sidebar.classList.remove("mobile-open");
+  if(backdrop)backdrop.hidden=true;
+  if(toggle)toggle.setAttribute?.("aria-expanded","false");
+  clearAlert();await reload();return;
  }
  const actionName=node.dataset.action,table=node.dataset.table,id=node.dataset.id;
  if(actionName==="close"){closeDialog();return}
