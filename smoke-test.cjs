@@ -112,7 +112,7 @@ const context={
  node("#cartBtn").onclick();
  await context.render();
  assert.equal(location.hash,"#/cart");
- assert.match(node("#app").innerHTML,/عربتك فارغة/,"cart page missing");
+ assert.match(node("#app").innerHTML,/سلة التسوق فارغة/,"cart page missing");
  await click({target:{closest(){return {dataset:{go:"offers"}}}}});
  await context.render();
  assert.equal(location.hash,"#/offers");
