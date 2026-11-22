@@ -30,12 +30,14 @@ assert.match(css,/BAZOO purple category navigation/,"purple nav styling missing"
 assert.match(css,/\.category-topbar\{\s*background:#5822af!important/,"category nav should use BAZOO purple");
 assert.match(css,/\.category-nav-link \.svg-icon\{color:#fff!important/,"category icons should be white");
 const nodes=new Map(), handlers=new Map(), data=new Map();
+const scrollCalls=[];
 function node(key){
  if(!nodes.has(key))nodes.set(key,{
   innerHTML:key==="#app"?"جاري تحميل متجر بازو...":"",
   textContent:"",value:"",hidden:false,dataset:{},style:{},
   classList:{add(){},remove(){},toggle(){},contains(){return false}},
   addEventListener(){},dispatchEvent(){},getAttribute(){return null},
+  scrollIntoView(options){scrollCalls.push({key,options})},
   querySelector(){return node(".test-field")},
   querySelectorAll(){return []},
   setAttribute(){},focus(){},setSelectionRange(){}
@@ -102,6 +104,7 @@ const context={
  await context.render();
  assert.equal(location.hash,"#/account","account button did not navigate");
  assert.match(node("#app").innerHTML,/authForm/,"login form not displayed");
+ assert.ok(scrollCalls.some(v=>v.key==="#app"&&v.options.behavior==="auto"),"route navigation should scroll to main content and respect reduced-motion preference");
  assert.match(node("#app").innerHTML,/data-password-toggle/,"password visibility missing");
  const click=handlers.get("click");
  assert.equal(typeof click,"function","navigation click handler missing");
@@ -117,5 +120,18 @@ const context={
  await context.render();
  assert.equal(location.hash,"#/offers");
  assert.match(node("#app").innerHTML,/عروض بازو/,"offers page missing");
+ const formSubmit=handlers.get("submit");
+ assert.equal(typeof formSubmit,"function","search navigation form handler missing");
+ node("#searchBox").value="هاتف";
+ await formSubmit({target:{id:"searchForm"},preventDefault(){}});
+ await context.render();
+ assert.equal(location.hash,"#/categories","search should navigate to the catalog");
+ assert.equal(scrollCalls.at(-1).key,"#categoryResults","search should scroll directly to catalog results");
+ await click({target:{closest(){return {dataset:{cat:"123"}}}}});
+ await context.render();
+ assert.equal(scrollCalls.at(-1).key,"#catalogFilters","category navigation should scroll to filter controls");
+ assert.match(node("#app").innerHTML,/id="catalogFilters"/,"catalog anchor missing");
+ assert.match(node("#app").innerHTML,/id="categoryResults"/,"search results anchor missing");
+
  console.log("PASS BAZOO: homepage, auth, categories, cart, offers and nationwide delivery headline");
 })().catch(e=>{console.error(e);process.exitCode=1});
