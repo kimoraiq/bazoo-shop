@@ -1,4 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm";
+import { createAdmin } from "./admin.js";
 const sb=createClient("https://kgghxcxaqmuypcdwubhr.supabase.co","sb_publishable_TZKy9nGrNFu1KqZqBpsw3Q_x17cq1qy",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=s=>document.querySelector(s);
 const money=n=>new Intl.NumberFormat("en-US").format(Number(n)||0)+" د.ع";
@@ -7,7 +8,7 @@ const safeImg=s=>/^https:\/\//i.test(String(s||""))?esc(s):"";
 const placeholder='<div class="placeholder">▣</div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"بالطريق",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={products:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],user:null,admin:false,route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,adminTab:"products",editProduct:null};
+const state={products:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],user:null,admin:false,route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -98,14 +99,15 @@ async function submitOrder(f){
 function shippingBind(sel,ship,total){
  const s=$(sel);if(!s)return;s.addEventListener("change",()=>{const rate=state.rates.find(x=>x.governorate===s.value&&x.enabled);$(ship).textContent=rate?money(rate.price_iqd):"اختر محافظة متاحة";$(total).textContent=rate?money(subtotal()+rate.price_iqd):money(subtotal())+" + التوصيل"});
 }
+const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo}=createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go});
 async function render(){
  const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  let content="";
  if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
  if(state.route!==route)return;$("#app").innerHTML=content;
- if(route==="cart")shippingBind("#cartGovernorate","#shippingPrice","#grandTotal");
- if(route==="checkout")shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal");
+ if(route==="cart"){const g=$("#cartGovernorate");if(g){g.value=state.selectedGovernorate;g.addEventListener("change",()=>state.selectedGovernorate=g.value);g.dispatchEvent(new Event("change"))}shippingBind("#cartGovernorate","#shippingPrice","#grandTotal")}
+ if(route==="checkout"){const g=$("#orderGovernorate");if(g){g.value=state.selectedGovernorate;g.dispatchEvent(new Event("change"))}shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal")}
  if(route==="admin")bindAdmin();
 }
 document.addEventListener("click",async e=>{
@@ -119,10 +121,10 @@ document.addEventListener("click",async e=>{
  if(b.dataset.remove){delete state.cart[b.dataset.remove];persist();render();return}
  if(b.dataset.slide){state.promoIndex=Math.max(0,state.promoIndex+Number(b.dataset.slide));render();return}
  if(b.dataset.authMode){authMode(b.dataset.authMode);return}
- if(b.id==="toCheckout"){if(!$("#cartGovernorate").value)return notify("اختار المحافظة حتى نحسب التوصيل");go("checkout");const g=$("#orderGovernorate");if(g){g.value=$("#cartGovernorate")?.value||"";g.dispatchEvent(new Event("change"))}return}
+ if(b.id==="toCheckout"){if(!$("#cartGovernorate").value)return notify("اختار المحافظة حتى نحسب التوصيل");state.selectedGovernorate=$("#cartGovernorate").value;go("checkout");return}
  if(b.id==="resetPassword"){const email=$('#authForm input[name="email"]')?.value.trim();if(!email)return notify("اكتب البريد الإلكتروني أولاً");const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#/account"});notify(error?error.message:"إذا البريد مسجل، راح توصلك رسالة إعادة تعيين كلمة المرور");return}
  if(b.id==="signOut"){await sb.auth.signOut();state.user=null;state.admin=false;notify("تم تسجيل الخروج");go("home");return}
- if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;render();return}
+ if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;state.editProduct=null;render();return}
  if(b.dataset.editProduct){state.editProduct=b.dataset.editProduct;render();return}
  if(b.id==="newProduct"){state.editProduct="new";render();return}
  if(b.dataset.editPromo){showPromoEditor(b.dataset.editPromo);return}
