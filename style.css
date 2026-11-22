@@ -496,3 +496,11 @@ body{background:#fbfafc;color:var(--ink)}
  .banner-preview.mobile-preview{max-width:200px;width:100%;margin:0 auto}
 }
 @media(prefers-reduced-motion:reduce){.rail-container:not(.rail-visited) .rail-next.attention{animation:none!important}}
+
+
+/* Real photographic category thumbnails */
+.home-categories .category-circle{overflow:hidden;background:#f9f7fc;border:1px solid #eee6f3;box-shadow:0 4px 17px #2e115017}
+.home-categories .category-thumb{width:100%;height:100%;object-fit:cover;display:block;padding:0;border-radius:50%;transition:transform .24s ease}
+.home-categories .round-category:hover .category-thumb{transform:scale(1.065)}
+.home-categories .category-fallback{font-size:37px;color:var(--p);font-weight:900}
+@media(max-width:600px){.home-categories .category-fallback{font-size:25px}}
