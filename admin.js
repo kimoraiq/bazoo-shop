@@ -162,7 +162,7 @@ async function membersPage(){
     const email=member.email||(owner?state.user.email:"بريد غير مسجل");
     const granted=member.role==="limited"?staffScopes.filter(([key])=>member.permissions?.[key]===true).map(x=>x[1]):[];
     return '<article class="staff-card"><div class="staff-card-main"><span class="staff-avatar">'+icon(owner?"shield-check":"user-round",24)+'</span><div class="staff-info"><strong>'+esc(email)+'</strong><span class="staff-role '+(owner?"owner-role":"")+'">'+esc(roleLabel(member.role))+'</span></div></div>'
-    +(member.role==="limited"?'<p class="staff-grants">'+(granted.length?granted.map(x=>'<span>'+esc(x)+'</span>').join(""):"بدون مهام")+'</p>':'<p class="staff-grants">'+(owner?"التحكم الكامل بالمتجر وبحسابات الإدارة":"إدارة كل أقسام المتجر، بدون صلاحية إضافة مدراء")+'</p>')
+    +(member.role==="limited"?'<p class="staff-grants">'+(granted.length?granted.map(x=>'<span>'+esc(x)+'</span>').join(""):"بدون مهام")+'</p>':'<p class="staff-grants">'+(owner?"التحكم الكامل بالمتجر وبحسابات الإدارة":"إدارة جميع أقسام المتجر دون صلاحية إضافة مسؤولين.")+'</p>')
     +(!owner?'<div class="staff-actions"><button type="button" class="btn outline" data-staff-edit="'+member.user_id+'">'+icon("settings",16)+' تعديل الصلاحيات</button><button type="button" class="btn danger" data-staff-remove="'+member.user_id+'">'+icon("x",16)+' إزالة المسؤول</button></div>':'<div class="staff-owner-note">'+icon("shield-check",16)+' الحساب محمي ولا يمكن حذفه من هنا</div>')
     +'</article>';
  }).join("")+'</div></section>';
@@ -220,7 +220,7 @@ else body='<button class="btn primary" id="newProduct" style="margin-bottom:16px
 }
 if(state.adminTab==="orders"){
 const {data,error}=await sb.from("orders").select("id,created_at,customer_name,phone,governorate,address,note,payment_method,total_iqd,status,order_items(product_name,quantity)").order("created_at",{ascending:false}).limit(150);
-body=error?'<p class="error">'+esc(error.message)+'</p>':'<div class="card admin-table"><table><thead><tr><th>الطلب</th><th>العميل</th><th>العنوان</th><th>المنتجات</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>'+((data||[]).map(o=>'<tr><td>'+esc(o.id.slice(0,8))+'<br>'+new Date(o.created_at).toLocaleDateString("ar-IQ")+'</td><td>'+esc(o.customer_name)+'<br>'+esc(o.phone)+'</td><td>'+esc(o.governorate)+'<br>'+esc(o.address)+'<br>'+esc(o.note)+'</td><td>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join("<br>")+'</td><td>'+money(o.total_iqd)+'</td><td><select class="field" data-status="'+o.id+'">'+[["new","جديد"],["confirmed","تم التأكيد"],["packing","تجهيز"],["shipped","بالطريق"],["delivered","مسلّم"],["cancelled","ملغي"]].map(([k,v])=>'<option value="'+k+'" '+(o.status===k?"selected":"")+'>'+v+'</option>').join("")+'</select></td></tr>').join("")||'<tr><td colspan="6">لا توجد طلبات بعد</td></tr>')+'</tbody></table></div>';
+body=error?'<p class="error">'+esc(error.message)+'</p>':'<div class="card admin-table"><table><thead><tr><th>الطلب</th><th>العميل</th><th>العنوان</th><th>المنتجات</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>'+((data||[]).map(o=>'<tr><td>'+esc(o.id.slice(0,8))+'<br>'+new Date(o.created_at).toLocaleDateString("ar-IQ")+'</td><td>'+esc(o.customer_name)+'<br>'+esc(o.phone)+'</td><td>'+esc(o.governorate)+'<br>'+esc(o.address)+'<br>'+esc(o.note)+'</td><td>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join("<br>")+'</td><td>'+money(o.total_iqd)+'</td><td><select class="field" data-status="'+o.id+'">'+[["new","جديد"],["confirmed","تم التأكيد"],["packing","تجهيز"],["shipped","قيد التوصيل"],["delivered","مسلّم"],["cancelled","ملغي"]].map(([k,v])=>'<option value="'+k+'" '+(o.status===k?"selected":"")+'>'+v+'</option>').join("")+'</select></td></tr>').join("")||'<tr><td colspan="6">لا توجد طلبات بعد</td></tr>')+'</tbody></table></div>';
 }
 if(state.adminTab==="shipping")body='<div class="card"><p class="subtle">جميع المحافظات غير مفعّلة مبدئياً. حدد رسوم التوصيل الصحيحة ثم فعّل الخدمة.</p><div class="admin-table"><table><thead><tr><th>المحافظة</th><th>التوصيل د.ع</th><th>مفعّل</th><th>حفظ</th></tr></thead><tbody>'+state.rates.map(r=>'<tr><td>'+esc(r.governorate)+'</td><td><input class="field" type="number" min="0" step="1" id="rate-'+esc(r.governorate)+'" value="'+r.price_iqd+'"></td><td><input type="checkbox" id="enabled-'+esc(r.governorate)+'" '+(r.enabled?"checked":"")+'></td><td><button data-rate="'+esc(r.governorate)+'"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#check"></use></svg> حفظ</button></td></tr>').join("")+'</tbody></table></div></div>';
 if(state.adminTab==="categories"||state.adminTab==="brands"){
@@ -371,20 +371,20 @@ function showPromoEditor(id){
  const p=state.promos.find(x=>x.id===id)||{};
  const desk=safeImg(p.desktop_image_url||p.image_url),mobile=safeImg(p.mobile_image_url||p.desktop_image_url||p.image_url);
  const preview=(name,label,dimensions,src)=>'<label class="banner-upload-box '+name+'"><span class="banner-upload-header">'+icon("image",17)+' '+label+' <small>'+dimensions+'</small></span><span class="banner-preview '+name+'-preview" id="preview-'+name+'">'+(src?'<img src="'+src+'" alt="معاينة اللافتة الإعلانية">':icon("image",32))+'</span><span class="banner-upload-guide">يُضبط مقاس الصورة مع الحفاظ على تفاصيل التصميم قدر الإمكان.</span><input class="field" type="file" accept="image/png,image/jpeg,image/webp" name="photo_'+name+'"></label>';
- openModal(p.id?"تعديل اللافتة الإعلانية":"إضافة لافتة إعلانية",'<form id="adminPromoForm" class="stack banner-editor" novalidate>'
+ openModal(p.id?"تعديل الإعلان":"إضافة إعلان",'<form id="adminPromoForm" class="stack banner-editor" novalidate>'
   +'<input type="hidden" name="id" value="'+esc(p.id||"")+'">'
-  +'<label class="formgroup">عنوان اللافتة الإعلانية *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
+  +'<label class="formgroup">عنوان الإعلان *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
   +'<label class="formgroup">النص التوضيحي<input name="subtitle" class="field" maxlength="170" value="'+esc(p.subtitle||"")+'"></label>'
   +'<label class="formgroup">نمط العرض<select name="artwork_only" class="field"><option value="true" '+(p.artwork_only!==false?"selected":"")+'>تصميم إعلان جاهز (الصورة تحتوي النصوص والمنتجات)</option><option value="false" '+(p.artwork_only===false?"selected":"")+'>صورة مع عنوان وزر من الموقع</option></select></label>'
-  +'<label class="formgroup">منتج مرتبط باللافتة الإعلانية (اختياري)<select class="field" name="product_id"><option value="">لافتة إعلانية عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
+  +'<label class="formgroup">منتج مرتبط بالإعلان (اختياري)<select class="field" name="product_id"><option value="">إعلان عامة دون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة الحاسوب","1440 × 480",desk)+preview("mobile","صورة الهاتف","720 × 900",mobile)+'</div>'
   +'<p class="note">ارفع التصميم الإعلاني بنسختين منفصلتين للحاسوب والهاتف. تُضغط كل صورة تلقائياً إلى 1 ميغابايت كحد أقصى مع الحفاظ على الجودة قدر الإمكان. يبقى الحد الأقصى لصور المنتجات 15 كيلوبايت.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<div class="formgrid"><label class="formgroup">مكان الظهور<select name="placement" class="field">'+[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.placement||"home")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<label class="formgroup">ترتيب العرض<input type="number" name="sort_order" min="0" max="9999" class="field" value="'+esc(p.sort_order??0)+'"></label>'
   +'<label class="formgroup">الظهور<select name="active" class="field"><option value="true" '+(p.active!==false?"selected":"")+'>منشور</option><option value="false" '+(p.active===false?"selected":"")+'>مخفي</option></select></label>'
-  +'<label class="formgroup">نوع اللافتة الإعلانية<select name="is_demo" class="field"><option value="false" '+(!p.is_demo?"selected":"")+'>حقيقي</option><option value="true" '+(p.is_demo?"selected":"")+'>تجريبي</option></select></label></div>'
-  +'<button class="btn primary" type="submit">'+icon("upload",17)+' حفظ ونشر اللافتة الإعلانية</button></form>');
+  +'<label class="formgroup">نوع الإعلان<select name="is_demo" class="field"><option value="false" '+(!p.is_demo?"selected":"")+'>حقيقي</option><option value="true" '+(p.is_demo?"selected":"")+'>تجريبي</option></select></label></div>'
+  +'<button class="btn primary" type="submit">'+icon("upload",17)+' حفظ ونشر الإعلان</button></form>');
  const f=document.querySelector("#adminPromoForm");
  for(const type of ["desktop","mobile"]){
   const input=f.elements["photo_"+type];
@@ -396,7 +396,7 @@ function showPromoEditor(id){
     const optimized=await prepareBannerPhoto(file,type);
     if(input.files?.[0]!==file||!preview.isConnected)return;
     const url=URL.createObjectURL(optimized);
-    preview.innerHTML='<img alt="معاينة اللافتة الإعلانية المضغوط" src="'+url+'"><span class="media-size-ok">بعد الضغط: '+humanKb(optimized.size)+'</span>';
+    preview.innerHTML='<img alt="معاينة الصورة الإعلانية المضغوطة" src="'+url+'"><span class="media-size-ok">بعد الضغط: '+humanKb(optimized.size)+'</span>';
     preview.querySelector("img")?.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
    }catch(err){
     if(input.files?.[0]!==file)return;
@@ -442,7 +442,7 @@ function prepareBannerPhoto(file,type){
 async function uploadBannerPhoto(file,type){
  if(!file?.size)return null;
  const blob=await prepareBannerPhoto(file,type);
- if(blob.size>MAX_BANNER_BYTES)throw Error("حجم اللافتة الإعلانية تجاوز 1 ميغابايت بعد الضغط");
+ if(blob.size>MAX_BANNER_BYTES)throw Error("تجاوز حجم الصورة الإعلانية 1 ميغابايت بعد الضغط.");
  const name="promotions/"+type+"/"+crypto.randomUUID()+"."+imageExtension(blob);
  const {error}=await sb.storage.from("promo-images").upload(name,blob,{contentType:blob.type,cacheControl:"31536000"});
  if(error)throw Error(error.message);
@@ -453,7 +453,7 @@ async function savePromo(form){
  const v={title:String(f.get("title")||"").trim(),subtitle:String(f.get("subtitle")||"").trim(),
   placement:String(f.get("placement")),link_url:String(f.get("link_url")),product_id:f.get("product_id")?String(f.get("product_id")):null,artwork_only:f.get("artwork_only")==="true",active:f.get("active")==="true",
   is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
- if(!v.title){notify("اكتب عنوان اللافتة الإعلانية");return}
+ if(!v.title){notify("اكتب عنوان الإعلان");return}
  const button=form.querySelector('button[type="submit"]');button.disabled=true;
  button.textContent="جارٍ تجهيز الصور الإعلانية...";
  try{
@@ -463,12 +463,12 @@ async function savePromo(form){
   v.desktop_image_url=desktop||previous?.desktop_image_url||previous?.image_url||null;
   v.mobile_image_url=mobile||previous?.mobile_image_url||previous?.desktop_image_url||previous?.image_url||null;
   v.image_url=v.desktop_image_url;
-  if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة الحاسوب أو اربط اللافتة الإعلانية بمنتج له صورة");return}
+  if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة الحاسوب أو اربط الإعلان بمنتج له صورة");return}
   const result=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);
   if(result.error)throw Error(result.error.message);
   closeModal();await loadCatalog();notify("تم حفظ الصور الإعلانية للهاتف والحاسوب.");render();
- }catch(e){notify("تعذّر حفظ اللافتة الإعلانية: "+e.message)}
- finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر اللافتة الإعلانية"}
+ }catch(e){notify("تعذّر حفظ الإعلان: "+e.message)}
+ finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر الإعلان"}
 }
 async function toggleRecord(table,id){
  const source=table==="products"?state.products:table==="promotions"?state.promos:table==="categories"?state.categories:state.brands;
@@ -491,7 +491,7 @@ function showTaxonomyEditor(table,id){
  const rows=cat?state.categories:state.brands;
  const obj=rows.find(x=>String(x.id)===String(id))||{};
  const groups=cat?'<label class="formgroup">تابعة لقسم<select class="field" name="parent_id"><option value="">فئة رئيسية</option>'+rows.filter(x=>!x.parent_id&&x.id!==obj.id).map(x=>'<option value="'+x.id+'" '+(String(obj.parent_id)===String(x.id)?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label><label class="formgroup">الترتيب<input class="field" type="number" name="sort_order" min="0" max="9999" value="'+esc(obj.sort_order??0)+'"></label>':"";
- openModal(obj.id?"تعديل":"إضافة",'<form class="stack" id="adminTaxonomyForm"><input type="hidden" name="table" value="'+table+'"><input type="hidden" name="id" value="'+esc(obj.id||"")+'"><label class="formgroup">الاسم *<input name="name" class="field" minlength="2" maxlength="100" required value="'+esc(obj.name||"")+'"></label><label class="formgroup">معرّف بالإنجليزي (اختياري عند الإضافة)<input name="slug" class="field" pattern="[a-z0-9-]+" value="'+esc(obj.slug||"")+'"></label>'+groups+'<label class="formgroup">الظهور<select class="field" name="active"><option value="true" '+(obj.active!==false?"selected":"")+'>ظاهر</option><option value="false" '+(obj.active===false?"selected":"")+'>مخفي</option></select></label><button type="submit" class="btn primary">'+icon("check",17)+' حفظ</button></form>');
+ openModal(obj.id?"تعديل":"إضافة",'<form class="stack" id="adminTaxonomyForm"><input type="hidden" name="table" value="'+table+'"><input type="hidden" name="id" value="'+esc(obj.id||"")+'"><label class="formgroup">الاسم *<input name="name" class="field" minlength="2" maxlength="100" required value="'+esc(obj.name||"")+'"></label><label class="formgroup">معرّف باللغة الإنجليزية (اختياري)<input name="slug" class="field" pattern="[a-z0-9-]+" value="'+esc(obj.slug||"")+'"></label>'+groups+'<label class="formgroup">الظهور<select class="field" name="active"><option value="true" '+(obj.active!==false?"selected":"")+'>ظاهر</option><option value="false" '+(obj.active===false?"selected":"")+'>مخفي</option></select></label><button type="submit" class="btn primary">'+icon("check",17)+' حفظ</button></form>');
 }
 async function saveTaxonomy(form){
  const f=new FormData(form),table=String(f.get("table")),id=f.get("id");
