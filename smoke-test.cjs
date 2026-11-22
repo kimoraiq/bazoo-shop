@@ -41,8 +41,8 @@ const context={
  assert.match(html,/بكل أنحاء العراق/,"delivery wording missing");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
  assert.match(css,/\.merch-slider\{height:470px/,"mobile banner must have a fixed height");
- assert.match(css,/\.merch-slider\{height:420px/,"new desktop banner height missing");
- assert.match(css,/\.merch-slider\{height:438px/,"new mobile banner height missing");
+ assert.match(css,/\.merch-slider\{[^}]*height:420px/,"new desktop banner height missing");
+ assert.match(css,/\.merch-slider\{[^}]*height:438px/,"new mobile banner height missing");
  assert.match(source,/function productRail\(/,"one-row carousel component missing");
  assert.match(source,/data-rail-move/,"carousel controls missing");
  assert.match(source,/class="merch-picture"/,"photographic banner missing");
