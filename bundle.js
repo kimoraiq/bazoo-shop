@@ -1,4 +1,4 @@
-/* BAZOO server-verified owner permissions and session diagnostics */
+/* BAZOO verified product persistence, direct form save and safe admin writes */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -352,9 +352,13 @@ if(state.adminTab==="categories"||state.adminTab==="brands"){
  body='<div class="row" style="margin-bottom:16px"><p class="subtle">يمكنك إضافة العناصر وتعديلها وإخفاؤها وحذفها، وستنعكس التغييرات على المتجر.</p><button class="btn primary" data-new-taxonomy="'+table+'">'+icon("plus",18)+' إضافة '+type+'</button></div><div class="card admin-table"><table><thead><tr><th>الاسم</th><th>المعرّف</th><th>الحالة</th><th>الإدارة</th></tr></thead><tbody>'+rows.map(item=>'<tr><td>'+esc(item.name)+'</td><td>'+esc(item.slug)+'</td><td>'+(item.active?"ظاهر":"مخفي")+'</td><td><button data-edit-taxonomy="'+table+'" data-record-id="'+item.id+'">تعديل</button><button data-toggle-taxonomy="'+table+'" data-record-id="'+item.id+'">'+(item.active?"إخفاء":"إظهار")+'</button><button class="danger-action" data-delete-taxonomy="'+table+'" data-record-id="'+item.id+'">حذف</button></td></tr>').join("")+'</tbody></table></div>';
 }
 if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" style="margin-bottom:16px"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#plus"></use></svg> إعلان جديد</button><div class="card admin-table"><table><thead><tr><th>الإعلان</th><th>المكان</th><th>الحالة</th><th>تعديل</th></tr></thead><tbody>'+(state.promos.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(p.placement)+'</td><td>'+(p.active?"نشط":"مخفي")+'</td><td><button data-edit-promo="'+p.id+'">تعديل</button><button data-toggle-promo="'+p.id+'">'+(p.active?"إخفاء":"نشر")+'</button><button class="danger-action" data-delete-promo="'+p.id+'">حذف</button></td></tr>').join("")||'<tr><td colspan="4">لا توجد إعلانات</td></tr>')+'</tbody></table></div>';
+if(state.lastAdminSave&&state.adminTab==="products")body='<div class="admin-save-confirmation" role="status">'+esc(state.lastAdminSave)+' <button type="button" data-dismiss-admin-notice aria-label="إغلاق التنبيه">×</button></div>'+body;
 return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
 function bindAdmin(){
+ document.querySelectorAll("[data-dismiss-admin-notice]").forEach(b=>b.onclick=()=>{
+  state.lastAdminSave="";render();
+ });
  // Bind admin actions directly to their visible buttons, rather than relying
  // solely on the storefront's generic delegated navigation handler.
  document.querySelectorAll("[data-admin-tab]").forEach(b=>b.onclick=e=>{
@@ -392,8 +396,8 @@ document.querySelectorAll("[data-delete-taxonomy]").forEach(b=>b.onclick=()=>rem
 const imageById=id=>state.productImages.find(x=>x.id===id);
 document.querySelectorAll("[data-admin-cover]").forEach(btn=>btn.onclick=async()=>{
  const img=imageById(btn.dataset.adminCover);if(!img)return;
- const {error}=await sb.from("products").update({image_url:img.image_url}).eq("id",img.product_id);
- if(error)return notify("تعذّر تغيير الصورة الرئيسية: "+error.message);
+ const {data,error}=await sb.from("products").update({image_url:img.image_url}).eq("id",img.product_id).select("id,image_url").single();
+ if(error||!data)return notify("تعذّر تغيير الصورة الرئيسية: "+(error?.message||"لم يتم تحديث المنتج."));
  await loadCatalog();notify("تم اختيار الصورة الرئيسية");render();
 });
 document.querySelectorAll("[data-admin-img-delete]").forEach(btn=>btn.onclick=()=>{
@@ -402,11 +406,11 @@ document.querySelectorAll("[data-admin-img-delete]").forEach(btn=>btn.onclick=()
   const p=state.products.find(x=>x.id===img.product_id);
   const left=state.productImages.filter(x=>x.product_id===img.product_id&&x.id!==img.id).sort((a,b)=>a.sort_order-b.sort_order);
   if(p?.image_url===img.image_url){
-   const {error}=await sb.from("products").update({image_url:left[0]?.image_url||null}).eq("id",img.product_id);
-   if(error){notify(error.message);return false}
+   const {data,error}=await sb.from("products").update({image_url:left[0]?.image_url||null}).eq("id",img.product_id).select("id").single();
+   if(error||!data){notify(error?.message||"لم تُحدّث الصورة الرئيسية.");return false}
   }
-  const {error}=await sb.from("product_images").delete().eq("id",img.id);
-  if(error){notify(error.message);return false}
+  const {data,error}=await sb.from("product_images").delete().eq("id",img.id).select("id").single();
+  if(error||!data){notify(error?.message||"لم تُحذف الصورة.");return false}
   await loadCatalog();notify("تم حذف الصورة من المعرض");render();return true;
  });
 });
@@ -415,12 +419,19 @@ document.querySelectorAll("[data-admin-img-up]").forEach(btn=>btn.onclick=async(
  const list=state.productImages.filter(x=>x.product_id===img.product_id).sort((a,b)=>a.sort_order-b.sort_order);
  const i=list.findIndex(x=>x.id===img.id);if(i<1)return;
  const prev=list[i-1];
- const first=await sb.from("product_images").update({sort_order:prev.sort_order}).eq("id",img.id);
- const second=await sb.from("product_images").update({sort_order:img.sort_order}).eq("id",prev.id);
- if(first.error||second.error)return notify("تعذّر إعادة ترتيب الصور");
+ const first=await sb.from("product_images").update({sort_order:prev.sort_order}).eq("id",img.id).select("id").single();
+ const second=await sb.from("product_images").update({sort_order:img.sort_order}).eq("id",prev.id).select("id").single();
+ if(first.error||second.error||!first.data||!second.data)return notify("تعذّر إعادة ترتيب الصور: "+(first.error?.message||second.error?.message||"لم يتأكد التعديل."));
  await loadCatalog();notify("تم تغيير ترتيب الصور");render();
 });
 const f=document.querySelector("#adminProductForm");if(f){
+ // Product saves use a direct form handler, so delegated site navigation and
+ // modal listeners cannot silently swallow the submit event.
+ f.onsubmit=event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  saveProduct(f).catch(error=>setProductSaveStatus(f,"تعذّر حفظ المنتج: "+(error?.message||"خطأ غير متوقع.")));
+ };
  const discountSave=f.querySelector("#saveDiscountOnly");
  if(discountSave)discountSave.onclick=()=>saveDiscountOnly(f);
 
@@ -457,8 +468,8 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
   });
  });
 }
-document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status);notify(error?error.message:"تم تحديث حالة الطلب ")});
-document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g);if(error)return notify(error.message);await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
+document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {data,error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status).select("id,status").single();notify(error||!data?(error?.message||"لم يتم تعديل حالة الطلب. يرجى التحقق من الصلاحيات."):"تم تحديث حالة الطلب.")});
+document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();if(error||!data)return notify(error?.message||"لم تتأكد عملية الحفظ. يرجى التحقق من الصلاحيات.");await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
 }
 function setProductSaveStatus(form,message,type="error"){
  const box=form?.querySelector?.("#productSaveStatus");
@@ -563,12 +574,13 @@ async function saveProduct(form){
   if(additions.length){
    const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
    const rows=additions.map((url,i)=>({product_id:savedRecord.id,image_url:url,alt_text:name,sort_order:maxOrder+i+1}));
-   const result=await sb.from("product_images").insert(rows);
-   if(result.error)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+result.error.message);
+   const result=await sb.from("product_images").insert(rows).select("id");
+   if(result.error||!Array.isArray(result.data)||result.data.length!==rows.length)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+(result.error?.message||"لم يُؤكَّد رفع جميع الصور."));
   }
   await loadCatalog();
   state.editProduct=null;
-  notify("تم حفظ المنتج والسعر والخصم بنجاح.");
+  state.lastAdminSave="تم حفظ المنتج «"+name+"» في قاعدة البيانات بنجاح. "+(priceInfo.percentage?"الخصم: "+priceInfo.percentage+"%.":"") ;
+  notify(state.lastAdminSave);
   await render();
  }catch(error){
   const saved=!!savedRecord;
@@ -679,8 +691,8 @@ async function savePromo(form){
   v.mobile_image_url=mobile||previous?.mobile_image_url||previous?.desktop_image_url||previous?.image_url||null;
   v.image_url=v.desktop_image_url;
   if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة الحاسوب أو اربط الإعلان بمنتج له صورة");return}
-  const result=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);
-  if(result.error)throw Error(result.error.message);
+  const result=id?await sb.from("promotions").update(v).eq("id",id).select("id").single():await sb.from("promotions").insert(v).select("id").single();
+  if(result.error||!result.data)throw Error(result.error?.message||"لم تؤكد قاعدة البيانات حفظ الإعلان.");
   closeModal();await loadCatalog();notify("تم حفظ الصور الإعلانية للهاتف والحاسوب.");render();
  }catch(e){notify("تعذّر حفظ الإعلان: "+e.message)}
  finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر الإعلان"}
@@ -688,14 +700,14 @@ async function savePromo(form){
 async function toggleRecord(table,id){
  const source=table==="products"?state.products:table==="promotions"?state.promos:table==="categories"?state.categories:state.brands;
  const item=source.find(x=>String(x.id)===String(id));if(!item)return;
- const {error}=await sb.from(table).update({active:!item.active}).eq("id",id);
- if(error){notify("تعذّر تغيير حالة النشر: "+error.message);return}
+ const {data,error}=await sb.from(table).update({active:!item.active}).eq("id",id).select("id,active").single();
+ if(error||!data){notify("تعذّر تغيير حالة النشر: "+(error?.message||"لم يتم تحديث السجل. يرجى التحقق من الصلاحيات وتسجيل الدخول."));return}
  await loadCatalog();notify(item.active?"تم إخفاء العنصر":"تم نشر العنصر");render();
 }
 function removeRecord(table,id,title){
  confirmAction("حذف "+title,"هل تريد حذف هذا العنصر من قاعدة البيانات؟ لا يمكن التراجع عن الحذف. إذا كانت الفئة مرتبطة بمنتجات، فاستخدم خيار الإخفاء بدلاً من الحذف.",async()=>{
-  const {error}=await sb.from(table).delete().eq("id",id);
-  if(error){notify("تعذّر الحذف: "+error.message);return false}
+  const {data,error}=await sb.from(table).delete().eq("id",id).select("id").single();
+  if(error||!data){notify("تعذّر الحذف: "+(error?.message||"لم يتم حذف السجل. يرجى التحقق من الصلاحيات وتسجيل الدخول."));return false}
   await loadCatalog();notify("تم حذف "+title);render();return true;
  });
 }
@@ -716,8 +728,8 @@ async function saveTaxonomy(form){
  if(name.length<2||!(/^[a-z0-9-]+$/.test(slug))){notify("الاسم غير صحيح أو المعرّف يحتوي رموز غير مسموحة");return}
  const data={name,slug,active:f.get("active")==="true"};
  if(table==="categories"){data.parent_id=f.get("parent_id")?Number(f.get("parent_id")):null;data.sort_order=Number(f.get("sort_order")||0);}
- const result=id?await sb.from(table).update(data).eq("id",id):await sb.from(table).insert(data);
- if(result.error){notify("تعذّر الحفظ: "+result.error.message);return}
+ const result=id?await sb.from(table).update(data).eq("id",id).select("id").single():await sb.from(table).insert(data).select("id").single();
+ if(result.error||!result.data){notify("تعذّر الحفظ: "+(result.error?.message||"لم يتم تأكيد حفظ البيانات. يرجى التحقق من الصلاحيات."));return}
  closeModal();await loadCatalog();notify("تم الحفظ وتحديث المتجر");render();
 }
 return {adminPage,bindAdmin,saveProduct,saveDiscountOnly,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
