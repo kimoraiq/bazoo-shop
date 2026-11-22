@@ -63,7 +63,7 @@ const context={
  assert.match(node("#app").innerHTML,/merch-slider/,"homepage not rendered");
  assert.match(node("#app").innerHTML,/home-categories/,"category circles missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
- assert.match(html,/بكل أنحاء العراق/,"delivery wording missing");
+ assert.match(html,/إلى جميع أنحاء العراق/,"correct nationwide delivery text missing");
  assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
  assert.match(css,/\.merch-slider\{height:470px/,"mobile banner must have a fixed height");
