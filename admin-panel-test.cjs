@@ -88,7 +88,7 @@ function form(values,type="productForm"){
  const category=form({id:"1",table:"categories",name:"الأجهزة الكهربائية",slug:"appliances",parent_id:"",sort_order:"0",active:"true"},"taxonomyForm");
  await admin.onSubmit({target:category,preventDefault(){},stopPropagation(){}});
  assert.equal(store.categories[0].name,"الأجهزة الكهربائية","category editing must persist");
- assert.match(node("alert").textContent,/تم حفظ الفئات/,"category editor must reach the database");
+ assert.match(node("alert").textContent,/تم حفظ التصنيف/,"category editor must reach the database");
  assert.equal(node("alert").className,"alert success");
  // Promo editor also has a hidden id field and must not be rejected.
  const promo=form({id:"",title:"عرض خاص",subtitle:"خصم",placement:"home",link_url:"#/offers",product_id:"p1",sort_order:"0",active:"true",artwork_only:"true",is_demo:"false"},"promoForm");
