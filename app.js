@@ -68,6 +68,15 @@ function productCard(p){
  return '<article class="product'+(p.is_demo?' demo-product':'')+'"><div class="prodimage" data-detail="'+p.id+'" role="button" tabindex="0" aria-label="تفاصيل '+esc(p.name)+'">'+(photo?'<img src="'+photo+'" loading="lazy" alt="'+esc(p.name)+'">':placeholder)+offerLabel+(p.is_demo?'<span class="demo-label">تجريبي</span>':'')+'</div><div class="prodinfo"><small>'+esc(brandName(p.brand_id)||catName(p.category_id))+'</small><h3>'+esc(p.name)+'</h3><div class="price-row"><strong class="cost">'+money(p.price_iqd)+'</strong>'+(p.compare_at_iqd>p.price_iqd?'<span class="old">'+money(p.compare_at_iqd)+'</span>':'')+'</div>'+(p.is_demo?'<div class="demo-price-note">السعر للتوضيح فقط • غير متاح للبيع</div>':'')+'<div class="prodfoot"><button class="btn primary" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+icon("plus",16)+(p.stock<1?' نفد المخزون':' أضف للعربة')+'</button><button class="heart '+(state.favs.includes(p.id)?"on":"")+'" data-fav="'+p.id+'" aria-label="المفضلة">'+icon("heart",19)+'</button></div></div></article>';
 }
 function productGrid(ps){return ps.length?'<div class="grid-products">'+ps.map(productCard).join("")+'</div>':'<div class="notice">ماكو منتجات منشورة بهذا القسم حالياً. راح تظهر المنتجات هنا من يضيفها فريق بازو </div>'}
+function productRail(products,id){
+ if(!products.length)return homeEmpty("منتجات جديدة قريباً","رح تظهر منتجات هذا القسم مباشرة من يرفعها الفريق.","package");
+ return '<div class="rail-container" data-rail="'+id+'"><button class="rail-arrow rail-back" data-rail-move="1" data-rail-id="'+id+'" aria-label="منتجات سابقة">'+icon("chevron-right",22)+'</button><div class="rail-scroll" data-rail-track="'+id+'" tabindex="0" aria-label="مرر لاستعراض بقية المنتجات">'+products.map(productCard).join("")+'</div><button class="rail-arrow rail-next attention" data-rail-move="-1" data-rail-id="'+id+'" aria-label="اسحب لرؤية بقية المنتجات">'+icon("chevron-left",22)+'</button></div>';
+}
+function railSection(id,kicker,title,products,route){
+ if(!products.length)return '';
+ return '<section class="home-section home-rail-section"><div class="rail-heading"><div><div class="kicker">'+esc(kicker)+'</div><h2>'+esc(title)+'</h2></div><button class="section-link" '+(route==='offers'?'data-go="offers"':route==='categories'?'data-go="categories"':'data-main-cat="'+esc(route)+'"')+'>استكشف المزيد '+icon("arrow-left",16)+'</button></div>'+productRail(products,id)+'</section>';
+}
+
 function promoFrame(place){const x=state.promos.filter(p=>p.active&&p.placement===place);if(!x.length)return "";const p=x[state.promoIndex%x.length];return '<div class="promo-frame">'+(p.image_url&&safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="'+esc(p.title)+'">':'')+'<h2>'+esc(p.title)+'</h2><p class="subtle">'+esc(p.subtitle)+'</p>'+(p.link_url?.startsWith("#/")?'<a href="'+esc(p.link_url)+'" class="btn accent">اكتشف المزيد</a>':'')+(x.length>1?'<div class="row" style="margin-top:15px"><button class="btn outline" data-slide="-1">السابق</button><span>'+((state.promoIndex%x.length)+1)+' / '+x.length+'</span><button class="btn outline" data-slide="1">التالي</button></div>':'')+'</div>'}
 
 const slugIcons={"home-appliances":"building","installation":"plug","devices-games":"laptop","accessories":"headphones","phones":"smartphone","office-supplies":"clipboard","school-supplies":"book-open"};
@@ -109,20 +118,19 @@ function brandGallery(){
  return '<div class="brand-gallery">'+list.map(b=>'<button class="brand-chip" '+(b.id?'data-brand="'+b.id+'"':'data-go="categories"')+'>'+icon("tag",15)+'<strong>'+esc(b.name)+'</strong></button>').join("")+'</div>';
 }
 function home(){
- const fresh=activeProducts().slice(0,10);
- const sales=activeProducts().filter(p=>p.on_sale||(p.compare_at_iqd!=null&&p.compare_at_iqd>p.price_iqd)).slice(0,10);
- const featured=activeProducts().filter(p=>p.featured).slice(0,10);
- const recommendations=featured.length?featured:fresh;
- return '<div class="home-main"><section class="merch-slider alt-'+(state.promoIndex%3)+'" id="heroSlider" aria-label="بنر المتجر المتبدّل">'+drawHero()+'</section>'
- +'<section class="home-section">'+sectionHead("اكتشف الأقسام","تسوّق حسب الفئة") + categoryCircles()+'</section>'
- +'<section class="home-section home-products"><div class="row" style="align-items:end;gap:12px">'+sectionHead("منتجات مختارة من الفريق","أفضل العروض")+'<button class="section-link" data-go="offers">عرض كل العروض '+icon("arrow-left",16)+'</button></div>'
- +(sales.length?productGrid(sales):homeEmpty("العروض قيد التجهيز","رح تظهر هنا المنتجات المخفّضة فور نشرها من فريق بازو.","percent"))+'</section>'
- +'<section class="home-section"><div class="category-feature-strip"><div class="feature-strip-item"><div><h3>الأجهزة الكهربائية</h3><p>أجهزة للبيت ومواد تأسيس</p><button class="btn outline" data-main-cat="appliances">تسوّق القسم '+icon("arrow-left",17)+'</button></div><span class="art">'+icon("plug",52)+'</span></div><div class="feature-strip-item"><div><h3>عالم الإلكترونيات</h3><p>أجهزة، ألعاب، هواتف وإكسسوارات</p><button class="btn outline" data-main-cat="electronics">تسوّق القسم '+icon("arrow-left",17)+'</button></div><span class="art">'+icon("laptop",52)+'</span></div></div></section>'
- +'<section class="home-section home-products"><div class="row" style="align-items:end;gap:12px">'+sectionHead("المنتجات الأحدث","مختارات BAZOO")+'<button class="section-link" data-go="categories">كل المنتجات '+icon("arrow-left",16)+'</button></div>'
- +(recommendations.length?productGrid(recommendations):homeEmpty("قريباً منتجات جديدة","المنتجات الفعلية ستظهر هنا بمجرد إضافتها من لوحة الإدارة.","shopping-bag"))+'</section>'
- +'<section class="home-section">'+sectionHead("اختار العلامة اللي تثق بيها","تسوّق حسب العلامة التجارية") +brandGallery()+'</section>'
- +'<section class="benefits home-benefits"><div class="benefit"><i>'+icon("truck",25)+'</i><div><strong>التوصيل لكل العراق</strong><small>أجور التوصيل تظهر عند الطلب</small></div></div><div class="benefit"><i>'+icon("package",25)+'</i><div><strong>مخزون حقيقي</strong><small>حسب المنتجات المنشورة</small></div></div><div class="benefit"><i>'+icon("shield-check",25)+'</i><div><strong>حسابات آمنة</strong><small>حماية بيانات الزبائن</small></div></div><div class="benefit"><i>'+icon("headphones",25)+'</i><div><strong>تجربة تسوّق سهلة</strong><small>من الهاتف أو الكمبيوتر</small></div></div></section>'
- +'</div>';
+ const products=activeProducts();
+ const offers=products.filter(p=>p.on_sale||(p.compare_at_iqd!=null&&p.compare_at_iqd>p.price_iqd));
+ const featured=products.filter(p=>p.featured);
+ const catProducts=slug=>{const c=state.categories.find(x=>x.slug===slug);if(!c)return [];const children=state.categories.filter(x=>x.parent_id===c.id).map(x=>x.id);return products.filter(p=>p.category_id===c.id||children.includes(p.category_id))};
+ return '<div class="home-main"><section class="merch-slider alt-'+(state.promoIndex%3)+'" id="heroSlider" aria-label="العروض الرئيسية">'+drawHero()+'</section>'
+ +'<section class="home-section"><div class="rail-heading"><div><div class="kicker">اكتشف الأقسام</div><h2>تسوّق حسب الفئة</h2></div></div>'+categoryCircles()+'</section>'
+ +railSection("offers","اختيارات خاصة","أفضل العروض",offers,"offers")
+ +railSection("featured","مختارة لك","منتجات مميزة",featured.length?featured:products.slice(0,9),"categories")
+ +railSection("electrical","كل ما يحتاجه البيت","الأجهزة الكهربائية",catProducts("appliances"),"appliances")
+ +railSection("tech","تقنيات حديثة","الإلكترونيات",catProducts("electronics"),"electronics")
+ +railSection("study","للشغل والدراسة","القرطاسية",catProducts("stationery"),"stationery")
+ +'<section class="home-section">'+sectionHead("اختار العلامة اللي تثق بيها","العلامات التجارية")+brandGallery()+'</section>'
+ +'<section class="benefits home-benefits"><div class="benefit"><i>'+icon("truck",25)+'</i><div><strong>توصيل لكل العراق</strong><small>حسب أجور المحافظة</small></div></div><div class="benefit"><i>'+icon("package",25)+'</i><div><strong>منتجات متنوعة</strong><small>الفريق يحدّثها باستمرار</small></div></div><div class="benefit"><i>'+icon("shield-check",25)+'</i><div><strong>طلب آمن</strong><small>مع متابعة حالة الطلب</small></div></div><div class="benefit"><i>'+icon("headphones",25)+'</i><div><strong>تسوق بكل سهولة</strong><small>من الموبايل والكمبيوتر</small></div></div></section></div>';
 }
 function brandsPage(){
  return '<div class="page"><div class="section-head"><div><div class="kicker">BRANDS AT BAZOO</div><h1>العلامات التجارية</h1><p class="subtle">اختار العلامة التجارية لعرض منتجاتها الموجودة بالمتجر.</p></div></div>'+brandGallery()+'</div>';
@@ -257,6 +265,7 @@ document.addEventListener("click",async e=>{
  if(b.dataset.fav){toggleFav(b.dataset.fav);return}
  if(b.dataset.qty){updateQty(b.dataset.qty,Number(b.dataset.step));return}
  if(b.dataset.remove){delete state.cart[b.dataset.remove];persist();render();return}
+ if(b.dataset.railMove){const rail=document.querySelector('[data-rail-track="'+b.dataset.railId+'"]');if(rail){const amount=Math.max(240,rail.clientWidth*.78);rail.scrollBy({left:Number(b.dataset.railMove)*amount,behavior:"smooth"});b.closest(".rail-container")?.classList.add("rail-visited")}return}
  if(b.dataset.slideTo!==undefined){state.promoIndex=Number(b.dataset.slideTo);const el=$("#heroSlider");if(el){el.innerHTML=drawHero();el.className="merch-slider alt-"+(state.promoIndex%3)}return}
  if(b.dataset.slide){state.promoIndex=Math.max(0,state.promoIndex+Number(b.dataset.slide));const hero=$("#heroSlider");if(hero){hero.innerHTML=drawHero();hero.className="merch-slider alt-"+(state.promoIndex%3)}else render();return}
  if(b.dataset.authMode){authMode(b.dataset.authMode);return}
