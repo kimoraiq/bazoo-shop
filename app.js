@@ -36,11 +36,70 @@ function productCard(p){
 }
 function productGrid(ps){return ps.length?'<div class="grid-products">'+ps.map(productCard).join("")+'</div>':'<div class="notice">ماكو منتجات منشورة بهذا القسم حالياً. راح تظهر المنتجات هنا من يضيفها فريق بازو </div>'}
 function promoFrame(place){const x=state.promos.filter(p=>p.active&&p.placement===place);if(!x.length)return "";const p=x[state.promoIndex%x.length];return '<div class="promo-frame">'+(p.image_url&&safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="'+esc(p.title)+'">':'')+'<h2>'+esc(p.title)+'</h2><p class="subtle">'+esc(p.subtitle)+'</p>'+(p.link_url?.startsWith("#/")?'<a href="'+esc(p.link_url)+'" class="btn accent">اكتشف المزيد</a>':'')+(x.length>1?'<div class="row" style="margin-top:15px"><button class="btn outline" data-slide="-1">السابق</button><span>'+((state.promoIndex%x.length)+1)+' / '+x.length+'</span><button class="btn outline" data-slide="1">التالي</button></div>':'')+'</div>'}
+
+const slugIcons={"home-appliances":"building","installation":"plug","devices-games":"laptop","accessories":"headphones","phones":"smartphone","office-supplies":"clipboard","school-supplies":"book-open"};
+const homeCategoryDefaults=[
+ {name:"أجهزة منزلية",slug:"home-appliances"},{name:"مواد تأسيس",slug:"installation"},
+ {name:"أجهزة وألعاب",slug:"devices-games"},{name:"إكسسوارات",slug:"accessories"},
+ {name:"هواتف",slug:"phones"},{name:"مواد مكتبية",slug:"office-supplies"},{name:"مواد دراسية",slug:"school-supplies"}
+];
+const defaultSlides=[
+ {title:"تسوّق براحة،",accent:"واختار على ذوقك.",subtitle:"أجهزة كهربائية وإلكترونيات وقرطاسية في مكان واحد. اكتشف أقسامنا واختار اللي تحتاجه.",icon:"shopping-bag",extra:"laptop",secondary:"smartphone",route:"categories",cta:"اكتشف المنتجات"},
+ {title:"كل اللي يحتاجه بيتك،",accent:"صار أقرب إلك.",subtitle:"استكشف الأجهزة المنزلية ومواد التأسيس من العلامات التجارية اللي تبحث عنها.",icon:"building",extra:"plug",secondary:"package",slug:"appliances",cta:"تسوّق الأجهزة"},
+ {title:"للشغل، الدراسة",accent:"وأوقات الترفيه.",subtitle:"من الهواتف والإكسسوارات إلى الأجهزة والألعاب والقرطاسية. اختيارات متنوّعة بمكان واحد.",icon:"laptop",extra:"headphones",secondary:"book-open",slug:"electronics",cta:"استكشف الإلكترونيات"}
+];
+function storefrontSlides(){
+ const promos=state.promos.filter(p=>p.active&&p.placement==="home");
+ return promos.length?promos.map(p=>({
+  title:p.title,accent:"",subtitle:p.subtitle,image:p.image_url,icon:"shopping-bag",
+  extra:"package",secondary:"tag",route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",
+  cta:"استكشف المزيد"
+ })):defaultSlides;
+}
+function drawHero(){
+ const slides=storefrontSlides();const index=((state.promoIndex%slides.length)+slides.length)%slides.length;const slide=slides[index];
+ const button=slide.slug?'<button class="btn accent" data-main-cat="'+esc(slide.slug)+'">'+esc(slide.cta)+' '+icon("arrow-left",17)+'</button>':'<button class="btn accent" data-go="'+esc(slide.route||"categories")+'">'+esc(slide.cta)+' '+icon("arrow-left",17)+'</button>';
+ const visual=slide.image&&safeImg(slide.image)?'<img class="merch-photo" src="'+safeImg(slide.image)+'" alt="'+esc(slide.title)+'" loading="eager">':
+ '<div class="merch-illustration"><div class="merch-primary-card">'+icon(slide.icon,126)+'</div><div class="merch-floating one">'+icon(slide.extra,42)+'</div><div class="merch-floating two">'+icon(slide.secondary,42)+'</div></div>';
+ return '<div class="merch-slider-inner"><div class="merch-content"><span class="merch-eyebrow">'+icon("sparkles",17)+' اكتشف عالم BAZOO</span><h1>'+esc(slide.title)+(slide.accent?'<br><b>'+esc(slide.accent)+'</b>':'')+'</h1><p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons">'+button+'<button class="btn ghost" data-go="offers">تصفح العروض</button></div></div><div class="merch-visual"><div class="merch-orbit"></div>'+visual+'</div></div><div class="slider-controls"><button data-slide="-1" aria-label="الشريحة السابقة">'+icon("chevron-right",18)+'</button><div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(index===i?'active':'')+'" aria-label="الشريحة '+(i+1)+'" aria-current="'+(index===i?'true':'false')+'"></button>').join("")+'</div><button data-slide="1" aria-label="الشريحة التالية">'+icon("chevron-left",18)+'</button></div>';
+}
+function categoryCircles(){
+ const list=homeCategoryDefaults.map(d=>{
+  const found=state.categories.find(c=>c.slug===d.slug&&c.active);
+  return {...d,id:found?.id,icon:slugIcons[d.slug]||"grid"};
+ });
+ return '<div class="home-categories">'+list.map(c=>'<button class="round-category" '+(c.id?'data-cat="'+c.id+'"':'data-go="categories"')+'><span class="category-circle">'+icon(c.icon,56)+'</span><span class="category-name">'+esc(c.name)+'</span></button>').join("")+'</div>';
+}
+function homeEmpty(title,description,iconName="package"){
+ return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
+}
+function brandGallery(){
+ const fallback=["جورنجي","DLC","LG","توشيبا","هايسنس","ميديا","نوال","TCL","بوش","رويال","كرين","برو","كينود","سوني","سامسونج","أبل","ريلمي","أوبو","تكنو","هونر","شاومي"];
+ const list=state.brands.length?state.brands.filter(b=>b.active):fallback.map(name=>({name,id:null}));
+ return '<div class="brand-gallery">'+list.map(b=>'<button class="brand-chip" '+(b.id?'data-brand="'+b.id+'"':'data-go="categories"')+'>'+icon("tag",15)+'<strong>'+esc(b.name)+'</strong></button>').join("")+'</div>';
+}
 function home(){
- const cats=state.categories.filter(c=>!c.parent_id&&c.active);
- const featured=activeProducts().filter(p=>p.featured).slice(0,8);
- const picked=(featured.length?featured:activeProducts().slice(0,8));
- return '<section class="hero"><div class="hero-content"><div class="pill"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#sparkles"></use></svg> عالم بازو للتسوّق</div><h1>كل اللي تحتاجه،<br><span>بمكان واحد.</span></h1><p>من الأجهزة الكهربائية للإلكترونيات والقرطاسية — اختر منتجاتك بسهولة ووصل طلبك لعنوانك.</p><div class="hero-buttons"><button class="btn accent" data-go="categories">تسوّق هسه <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#arrow-left"></use></svg></button><button class="btn ghost" data-go="offers">شوف العروض</button></div></div><div class="hero-graphic"><div class="hero-disc"><span class="hero-symbol"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#shopping-bag"></use></svg></span></div></div></section><div class="benefits"><div class="benefit"><i><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#truck"></use></svg></i><div><strong>توصيل للمحافظات المفعّلة</strong><small>الأجور تظهر بالعربة</small></div></div><div class="benefit"><i><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#package"></use></svg></i><div><strong>مخزون محدّث</strong><small>حسب توفر المنتجات</small></div></div><div class="benefit"><i><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#shield-check"></use></svg></i><div><strong>حساب وطلباتك</strong><small>تصفح بدون تسجيل</small></div></div><div class="benefit"><i></i><div><strong>منتجات متنوعة</strong><small>من فئات وعلامات متعددة</small></div></div></div>'+promoFrame("home")+'<section class="section">'+sectionHead("اختار اللي يناسبك","تسوّق حسب الفئة")+'<div class="cat-grid">'+cats.map(c=>'<button class="cat-tile" data-cat="'+c.id+'"><strong>'+esc(c.name)+'</strong><small>استكشف المنتجات <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#arrow-left"></use></svg></small></button>').join("")+'</div></section><section class="section">'+sectionHead("اختيارات المتجر","منتجات مميزة","المنتجات والأسعار يتم تحديثها من فريق بازو")+productGrid(picked)+'</section><section class="promo-card"><div class="kicker">BAZOO <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#percent"></use></svg></div><h2>عروض جديدة تنتظرك</h2><p>تصفح المنتجات المحددة كعروض مباشرة من فريق بازو.</p><button class="btn accent" data-go="offers">استكشف العروض <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#arrow-left"></use></svg></button></section>';
+ const fresh=activeProducts().slice(0,10);
+ const sales=activeProducts().filter(p=>p.on_sale||(p.compare_at_iqd!=null&&p.compare_at_iqd>p.price_iqd)).slice(0,10);
+ const featured=activeProducts().filter(p=>p.featured).slice(0,10);
+ const recommendations=featured.length?featured:fresh;
+ return '<div class="home-main"><section class="merch-slider alt-'+(state.promoIndex%3)+'" id="heroSlider" aria-label="بنر المتجر المتبدّل">'+drawHero()+'</section>'
+ +'<section class="home-section">'+sectionHead("اكتشف الأقسام","تسوّق حسب الفئة") + categoryCircles()+'</section>'
+ +'<section class="home-section home-products"><div class="row" style="align-items:end;gap:12px">'+sectionHead("منتجات مختارة من الفريق","أفضل العروض")+'<button class="section-link" data-go="offers">عرض كل العروض '+icon("arrow-left",16)+'</button></div>'
+ +(sales.length?productGrid(sales):homeEmpty("العروض قيد التجهيز","رح تظهر هنا المنتجات المخفّضة فور نشرها من فريق بازو.","percent"))+'</section>'
+ +'<section class="home-section"><div class="category-feature-strip"><div class="feature-strip-item"><div><h3>الأجهزة الكهربائية</h3><p>أجهزة للبيت ومواد تأسيس</p><button class="btn outline" data-main-cat="appliances">تسوّق القسم '+icon("arrow-left",17)+'</button></div><span class="art">'+icon("plug",52)+'</span></div><div class="feature-strip-item"><div><h3>عالم الإلكترونيات</h3><p>أجهزة، ألعاب، هواتف وإكسسوارات</p><button class="btn outline" data-main-cat="electronics">تسوّق القسم '+icon("arrow-left",17)+'</button></div><span class="art">'+icon("laptop",52)+'</span></div></div></section>'
+ +'<section class="home-section home-products"><div class="row" style="align-items:end;gap:12px">'+sectionHead("المنتجات الأحدث","مختارات BAZOO")+'<button class="section-link" data-go="categories">كل المنتجات '+icon("arrow-left",16)+'</button></div>'
+ +(recommendations.length?productGrid(recommendations):homeEmpty("قريباً منتجات جديدة","المنتجات الفعلية ستظهر هنا بمجرد إضافتها من لوحة الإدارة.","shopping-bag"))+'</section>'
+ +'<section class="home-section">'+sectionHead("اختار العلامة اللي تثق بيها","تسوّق حسب العلامة التجارية") +brandGallery()+'</section>'
+ +'<section class="benefits home-benefits"><div class="benefit"><i>'+icon("truck",25)+'</i><div><strong>التوصيل حسب المحافظة</strong><small>تُحتسب الأجور عند الطلب</small></div></div><div class="benefit"><i>'+icon("package",25)+'</i><div><strong>مخزون حقيقي</strong><small>حسب المنتجات المنشورة</small></div></div><div class="benefit"><i>'+icon("shield-check",25)+'</i><div><strong>حسابات آمنة</strong><small>حماية بيانات الزبائن</small></div></div><div class="benefit"><i>'+icon("headphones",25)+'</i><div><strong>تجربة تسوّق سهلة</strong><small>من الهاتف أو الكمبيوتر</small></div></div></section>'
+ +'</div>';
+}
+function brandsPage(){
+ return '<div class="page"><div class="section-head"><div><div class="kicker">BRANDS AT BAZOO</div><h1>العلامات التجارية</h1><p class="subtle">اختار العلامة التجارية لعرض منتجاتها الموجودة بالمتجر.</p></div></div>'+brandGallery()+'</div>';
+}
+function favoritesPage(){
+ const products=activeProducts().filter(p=>state.favs.includes(p.id));
+ return '<div class="page"><h1>المفضلة</h1><p class="subtle">منتجاتك المحفوظة على هذا الجهاز</p>'+productGrid(products)+'</div>';
 }
 function filters(){return '<div class="filter-panel"><label>القسم<select id="categoryFilter"><option value="">كل الأقسام</option>'+state.categories.filter(c=>c.active).map(c=>'<option value="'+c.id+'" '+(String(c.id)===String(state.category)?"selected":"")+'>'+(c.parent_id?"— ":"")+esc(c.name)+'</option>').join("")+'</select></label><label>العلامة التجارية<select id="brandFilter"><option value="">كل العلامات</option>'+state.brands.filter(b=>b.active).map(b=>'<option value="'+b.id+'" '+(String(b.id)===String(state.brand)?"selected":"")+'>'+esc(b.name)+'</option>').join("")+'</select></label><label>بحث عن منتج<input class="field" id="filterSearch" value="'+esc(state.q)+'" placeholder="اسم المنتج أو الماركة..."></label></div>'}
 function categories(){return '<div class="page"><h1>الفئات والعلامات التجارية</h1><p class="subtle">حدد القسم أو العلامة التجارية حتى تطلعلك المنتجات المناسبة</p>'+promoFrame("categories")+filters()+'<div class="section">'+sectionHead("المنتجات","اكتشف المنتجات")+productGrid(filterProducts())+'</div></div>'}
@@ -106,8 +165,9 @@ const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo}=createAdmin({s
 async function render(){
  const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
+ document.querySelectorAll("#categoryNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  let content="";
- if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
+ if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="brands")content=brandsPage();else if(route==="favorites")content=favoritesPage();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
  if(state.route!==route)return;
  if(state.catalogFailure)content='<div class="connection-notice" role="alert">'+icon("circle-alert",20)+' <span>تعذّر الاتصال بقاعدة بيانات بازو. تأكد من الإنترنت ثم أعد المحاولة.</span> <button class="btn outline" id="retryCatalog">'+icon("refresh",16)+' إعادة المحاولة</button></div>'+content;
  $("#app").innerHTML=content;
@@ -118,13 +178,16 @@ async function render(){
 document.addEventListener("click",async e=>{
  const b=e.target.closest("button,[data-detail]");if(!b)return;
  if(b.dataset.go){go(b.dataset.go);return}
+ if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.category=c?String(c.id):"";state.brand="";state.q="";go("categories");return}
+ if(b.dataset.brand){state.brand=b.dataset.brand;state.category="";state.q="";go("categories");return}
  if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories");return}
  if(b.dataset.add){add(b.dataset.add);return}
  if(b.dataset.detail){detail(b.dataset.detail);return}
  if(b.dataset.fav){toggleFav(b.dataset.fav);return}
  if(b.dataset.qty){updateQty(b.dataset.qty,Number(b.dataset.step));return}
  if(b.dataset.remove){delete state.cart[b.dataset.remove];persist();render();return}
- if(b.dataset.slide){state.promoIndex=Math.max(0,state.promoIndex+Number(b.dataset.slide));render();return}
+ if(b.dataset.slideTo!==undefined){state.promoIndex=Number(b.dataset.slideTo);const el=$("#heroSlider");if(el){el.innerHTML=drawHero();el.className="merch-slider alt-"+(state.promoIndex%3)}return}
+ if(b.dataset.slide){state.promoIndex=Math.max(0,state.promoIndex+Number(b.dataset.slide));const hero=$("#heroSlider");if(hero){hero.innerHTML=drawHero();hero.className="merch-slider alt-"+(state.promoIndex%3)}else render();return}
  if(b.dataset.authMode){authMode(b.dataset.authMode);return}
  if(b.dataset.passwordToggle){const input=document.querySelector('#authForm input[name="'+b.dataset.passwordToggle+'"]');if(input){const show=input.type==="password";input.type=show?"text":"password";b.innerHTML=icon(show?"eye-off":"eye",19);b.setAttribute("aria-label",show?"إخفاء كلمة المرور":"إظهار كلمة المرور")}return}
  if(b.id==="toCheckout"){if(!$("#cartGovernorate").value)return notify("اختار المحافظة حتى نحسب التوصيل");state.selectedGovernorate=$("#cartGovernorate").value;go("checkout");return}
@@ -140,9 +203,10 @@ document.addEventListener("click",async e=>{
 document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.category=e.target.value;render()}if(e.target.id==="brandFilter"){state.brand=e.target.value;render()}});
 let searchDebounce;document.addEventListener("input",e=>{if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
 document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm"].includes(id))return;e.preventDefault();if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target)});
-$("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#year").textContent=new Date().getFullYear();
+$("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",render);
+setInterval(()=>{if(state.route!=="home"||document.hidden||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;const hero=$("#heroSlider");if(!hero)return;state.promoIndex=(state.promoIndex+1)%storefrontSlides().length;hero.innerHTML=drawHero();hero.className="merch-slider alt-"+(state.promoIndex%3)},7000);
 sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(async()=>{await refreshAuth();if(["account","admin","checkout"].includes(state.route))render()},0)}});
 persist();
 render();
