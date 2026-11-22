@@ -18,14 +18,14 @@ export function createClient(baseUrl, publishableKey) {
     try{
       const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:JSON.stringify({refresh_token:session.refresh_token})},false);
       if(!res.ok)throw new Error(res.error?.message||"انتهت صلاحية الجلسة. يرجى تسجيل الدخول مجدداً.");
-      setSession(res.data);
+      setSession(res.data,"TOKEN_REFRESHED");
       return session?.access_token||null;
     }catch(e){session=null;save();emit("SIGNED_OUT");return null}
   };
-  const setSession=data=>{
+  const setSession=(data,event="SIGNED_IN")=>{
     if(!data?.access_token)return;
     session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+Number(data.expires_in||3600)};
-    save();emit("SIGNED_IN");
+    save();emit(event);
   };
   const rawFetch=async(path,options={},authorize=true)=>{
     const headers=new Headers(options.headers||{});
