@@ -52,29 +52,88 @@ const r=id?await sb.from("products").update(v).eq("id",id):await sb.from("produc
 await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج ");render();
 }catch(e){notify("فشل حفظ المنتج: "+e.message)}
 }
+
 function showPromoEditor(id){
-const p=state.promos.find(x=>x.id===id)||{};
-openModal(p.id?"تعديل الإعلان":"إعلان جديد",'<form id="adminPromoForm" class="stack"><input type="hidden" name="id" value="'+esc(p.id||"")+'"><label class="formgroup">عنوان الإعلان<input name="title" class="field" required value="'+esc(p.title||"")+'"></label><label class="formgroup">تفاصيل<input name="subtitle" class="field" value="'+esc(p.subtitle||"")+'"></label><label class="formgroup">رابط صورة HTTPS<input name="image_url" class="field" value="'+esc(p.image_url||"")+'"></label><label class="formgroup">رابط داخلي مثل #/offers<input name="link_url" class="field" value="'+esc(p.link_url||"")+'"></label><label class="formgroup">المكان<select name="placement" class="field"><option value="home">الرئيسية</option><option value="categories">الفئات</option><option value="cart">العربة</option></select></label><label class="formgroup">الحالة<select name="active" class="field"><option value="true">مفعّل</option><option value="false">مخفي</option></select></label><label class="formgroup">نوع الإعلان<select name="is_demo" class="field"><option value="false">إعلان حقيقي</option><option value="true">نموذج توضيحي</option></select></label><label class="formgroup">ترتيب الظهور<input type="number" name="sort_order" class="field" min="0" max="9999" value="'+esc(p.sort_order??0)+'"></label><label class="formgroup">رفع صورة للبنر<input type="file" name="photo" class="field" accept="image/png,image/jpeg,image/webp"></label><button class="btn primary">حفظ</button></form>');
-const form=document.querySelector("#adminPromoForm");if(p.id){form.elements.placement.value=p.placement;form.elements.active.value=String(p.active);form.elements.is_demo.value=String(p.is_demo||false)}
+ const p=state.promos.find(x=>x.id===id)||{};
+ const desk=safeImg(p.desktop_image_url||p.image_url),mobile=safeImg(p.mobile_image_url||p.desktop_image_url||p.image_url);
+ const preview=(name,label,dimensions,src)=>'<label class="banner-upload-box '+name+'"><span class="banner-upload-header">'+icon("image",17)+' '+label+' <small>'+dimensions+'</small></span><span class="banner-preview '+name+'-preview" id="preview-'+name+'">'+(src?'<img src="'+src+'" alt="معاينة البنر">':icon("image",32))+'</span><span class="banner-upload-guide">تُقصّ الصورة تلقائياً للمقاس الثابت قبل الرفع.</span><input class="field" type="file" accept="image/png,image/jpeg,image/webp" name="photo_'+name+'"></label>';
+ openModal(p.id?"تعديل البنر":"إضافة بنر",'<form id="adminPromoForm" class="stack banner-editor" novalidate>'
+  +'<input type="hidden" name="id" value="'+esc(p.id||"")+'">'
+  +'<label class="formgroup">عنوان البنر *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
+  +'<label class="formgroup">النص التوضيحي<input name="subtitle" class="field" maxlength="170" value="'+esc(p.subtitle||"")+'"></label>'
+  +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
+  +'<p class="note">ارفع صورة فوتوغرافية مناسبة لكل شاشة. تظهر الصورة داخل مساحة ثابتة، والنظام يقصها تلقائياً عند الحفظ دون تغيير ارتفاع البنر.</p>'
+  +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
+  +'<div class="formgrid"><label class="formgroup">مكان الظهور<select name="placement" class="field">'+[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.placement||"home")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
+  +'<label class="formgroup">ترتيب العرض<input type="number" name="sort_order" min="0" max="9999" class="field" value="'+esc(p.sort_order??0)+'"></label>'
+  +'<label class="formgroup">الظهور<select name="active" class="field"><option value="true" '+(p.active!==false?"selected":"")+'>منشور</option><option value="false" '+(p.active===false?"selected":"")+'>مخفي</option></select></label>'
+  +'<label class="formgroup">نوع البنر<select name="is_demo" class="field"><option value="false" '+(!p.is_demo?"selected":"")+'>حقيقي</option><option value="true" '+(p.is_demo?"selected":"")+'>تجريبي</option></select></label></div>'
+  +'<button class="btn primary" type="submit">'+icon("upload",17)+' حفظ ونشر البنر</button></form>');
+ const f=document.querySelector("#adminPromoForm");
+ for(const type of ["desktop","mobile"]){
+  const input=f.elements["photo_"+type];
+  input.addEventListener("change",()=>{
+   const file=input.files?.[0],preview=document.getElementById("preview-"+type);
+   if(!file)return;
+   if(!["image/jpeg","image/png","image/webp"].includes(file.type)){notify("صيغة الصورة غير مدعومة");input.value="";return}
+   const url=URL.createObjectURL(file);
+   preview.innerHTML='<img alt="معاينة البنر" src="'+url+'">';
+   preview.querySelector("img").addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+  });
+ }
+}
+async function cropBanner(file,width,height){
+ if(!file?.size)return null;
+ if(file.size>15*1024*1024)throw Error("الصورة أكبر من 15MB");
+ if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("يُقبل JPG وPNG وWEBP فقط");
+ const objectUrl=URL.createObjectURL(file);
+ try{
+  const img=await new Promise((resolve,reject)=>{
+   const image=new Image();
+   image.onload=()=>resolve(image);image.onerror=()=>reject(Error("تعذّر قراءة الصورة"));
+   image.src=objectUrl;
+  });
+  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext("2d");
+  if(!ctx)throw Error("المتصفح لا يدعم تجهيز الصور");
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,width,height);
+  const scale=Math.max(width/img.naturalWidth,height/img.naturalHeight);
+  const drawW=img.naturalWidth*scale,drawH=img.naturalHeight*scale;
+  ctx.drawImage(img,(width-drawW)/2,(height-drawH)/2,drawW,drawH);
+  return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error("تعذّر حفظ الصورة")),"image/jpeg",.88));
+ }finally{URL.revokeObjectURL(objectUrl)}
+}
+async function uploadBannerPhoto(file,type){
+ if(!file?.size)return null;
+ const dims=type==="desktop"?[1440,480]:[720,900];
+ const blob=await cropBanner(file,...dims);
+ const name="promotions/"+type+"/"+crypto.randomUUID()+".jpg";
+ const {error}=await sb.storage.from("product-images").upload(name,blob,{contentType:"image/jpeg"});
+ if(error)throw Error(error.message);
+ return sb.storage.from("product-images").getPublicUrl(name).data.publicUrl;
 }
 async function savePromo(form){
-const f=new FormData(form),id=f.get("id");const v={title:String(f.get("title")).trim(),subtitle:String(f.get("subtitle")||""),image_url:String(f.get("image_url")||"").trim()||null,link_url:String(f.get("link_url")||"").trim()||null,placement:f.get("placement"),active:f.get("active")==="true",is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
-if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("رابط الصورة لازم HTTPS");
-if(v.link_url&&!/^#\/(home|categories|offers|cart)$/.test(v.link_url))return notify("الرابط يجب يكون داخلي");
-try{
-const photo=f.get("photo");
-if(photo?.size){
- if(photo.size>5*1024*1024||!["image/png","image/jpeg","image/webp"].includes(photo.type))throw Error("الصورة غير مدعومة أو أكبر من 5MB");
- const ext={"image/png":"png","image/jpeg":"jpg","image/webp":"webp"}[photo.type],name="promotions/"+crypto.randomUUID()+"."+ext;
- const uploaded=await sb.storage.from("product-images").upload(name,photo,{contentType:photo.type});
- if(uploaded.error)throw Error(uploaded.error.message);
- v.image_url=sb.storage.from("product-images").getPublicUrl(name).data.publicUrl;
+ const f=new FormData(form),id=f.get("id");
+ const v={title:String(f.get("title")||"").trim(),subtitle:String(f.get("subtitle")||"").trim(),
+  placement:String(f.get("placement")),link_url:String(f.get("link_url")),active:f.get("active")==="true",
+  is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
+ if(!v.title){notify("اكتب عنوان البنر");return}
+ const button=form.querySelector('button[type="submit"]');button.disabled=true;
+ button.textContent="جاري تجهيز صور البنر...";
+ try{
+  const desktop=await uploadBannerPhoto(f.get("photo_desktop"),"desktop");
+  const mobile=await uploadBannerPhoto(f.get("photo_mobile"),"mobile");
+  const previous=state.promos.find(p=>p.id===id);
+  v.desktop_image_url=desktop||previous?.desktop_image_url||previous?.image_url||null;
+  v.mobile_image_url=mobile||previous?.mobile_image_url||previous?.desktop_image_url||previous?.image_url||null;
+  v.image_url=v.desktop_image_url;
+  if(v.placement==="home"&&!v.desktop_image_url){notify("ارفع صورة اللابتوب على الأقل حتى يظهر البنر بصورة حقيقية");return}
+  const result=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);
+  if(result.error)throw Error(result.error.message);
+  closeModal();await loadCatalog();notify("تم حفظ البنر للموبايل واللابتوب");render();
+ }catch(e){notify("تعذّر حفظ البنر: "+e.message)}
+ finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر البنر"}
 }
-const r=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);if(r.error)return notify(r.error.message);
-closeModal();await loadCatalog();notify("تم حفظ الإعلان ");render();
-}catch(error){notify("تعذّر رفع الإعلان: "+error.message)}
-}
-
 async function toggleRecord(table,id){
  const source=table==="products"?state.products:table==="promotions"?state.promos:table==="categories"?state.categories:state.brands;
  const item=source.find(x=>String(x.id)===String(id));if(!item)return;
