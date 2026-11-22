@@ -39,6 +39,7 @@ const context={
  assert.match(node("#app").innerHTML,/home-categories/,"category circles missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
  assert.match(html,/بكل أنحاء العراق/,"delivery wording missing");
+ assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
  assert.match(css,/\.merch-slider\{height:470px/,"mobile banner must have a fixed height");
  assert.match(css,/\.merch-slider\{[^}]*height:420px/,"new desktop banner height missing");
@@ -51,7 +52,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/bazoo9/,"asset cache bust missing");
+ assert.match(html,/bazoo10/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
