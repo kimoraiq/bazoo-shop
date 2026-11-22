@@ -4,6 +4,8 @@ const assert=require("node:assert/strict");
 const source=fs.readFileSync("bundle.js","utf8");
 const html=fs.readFileSync("index.html","utf8");
 const css=fs.readFileSync("style.css","utf8");
+assert.match(css,/\.header \.brand,\s*\.footer \.brand\s*\{[\s\S]*?background:transparent!important/,"white logo background must be removed");
+assert.match(css,/\.header \.brand img,\s*\.footer \.brand img\s*\{[\s\S]*?background:none!important/,"logo image must not have a white background");
 const nodes=new Map(), handlers=new Map(), data=new Map();
 function node(key){
  if(!nodes.has(key))nodes.set(key,{
@@ -52,7 +54,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/bazoo10/,"asset cache bust missing");
+ assert.match(html,/bazoo11/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
