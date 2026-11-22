@@ -61,6 +61,7 @@ function showPromoEditor(id){
   +'<input type="hidden" name="id" value="'+esc(p.id||"")+'">'
   +'<label class="formgroup">عنوان البنر *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
   +'<label class="formgroup">النص التوضيحي<input name="subtitle" class="field" maxlength="170" value="'+esc(p.subtitle||"")+'"></label>'
+  +'<label class="formgroup">منتج مرتبط بالبنر (اختياري)<select class="field" name="product_id"><option value="">بنر عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
   +'<p class="note">ارفع صورة فوتوغرافية مناسبة لكل شاشة. تظهر الصورة داخل مساحة ثابتة، والنظام يقصها تلقائياً عند الحفظ دون تغيير ارتفاع البنر.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
@@ -115,7 +116,7 @@ async function uploadBannerPhoto(file,type){
 async function savePromo(form){
  const f=new FormData(form),id=f.get("id");
  const v={title:String(f.get("title")||"").trim(),subtitle:String(f.get("subtitle")||"").trim(),
-  placement:String(f.get("placement")),link_url:String(f.get("link_url")),active:f.get("active")==="true",
+  placement:String(f.get("placement")),link_url:String(f.get("link_url")),product_id:f.get("product_id")?String(f.get("product_id")):null,active:f.get("active")==="true",
   is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
  if(!v.title){notify("اكتب عنوان البنر");return}
  const button=form.querySelector('button[type="submit"]');button.disabled=true;
@@ -127,7 +128,7 @@ async function savePromo(form){
   v.desktop_image_url=desktop||previous?.desktop_image_url||previous?.image_url||null;
   v.mobile_image_url=mobile||previous?.mobile_image_url||previous?.desktop_image_url||previous?.image_url||null;
   v.image_url=v.desktop_image_url;
-  if(v.placement==="home"&&!v.desktop_image_url){notify("ارفع صورة اللابتوب على الأقل حتى يظهر البنر بصورة حقيقية");return}
+  if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة اللابتوب أو اربط البنر بمنتج له صورة");return}
   const result=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);
   if(result.error)throw Error(result.error.message);
   closeModal();await loadCatalog();notify("تم حفظ البنر للموبايل واللابتوب");render();
