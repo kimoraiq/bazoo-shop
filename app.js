@@ -107,7 +107,7 @@ async function render(){
  if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
  if(state.route!==route)return;$("#app").innerHTML=content;
  if(route==="cart"){const g=$("#cartGovernorate");if(g){g.value=state.selectedGovernorate;g.addEventListener("change",()=>state.selectedGovernorate=g.value);g.dispatchEvent(new Event("change"))}shippingBind("#cartGovernorate","#shippingPrice","#grandTotal")}
- if(route==="checkout"){const g=$("#orderGovernorate");if(g){g.value=state.selectedGovernorate;g.dispatchEvent(new Event("change"))}shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal")}
+ if(route==="checkout"){const g=$("#orderGovernorate");if(g){g.value=state.selectedGovernorate;g.dispatchEvent(new Event("change"))}shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal");g?.dispatchEvent(new Event("change"))}
  if(route==="admin")bindAdmin();
 }
 document.addEventListener("click",async e=>{
