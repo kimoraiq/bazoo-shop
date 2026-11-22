@@ -1551,3 +1551,35 @@ html{scroll-behavior:smooth}
  .admin-access-actions{flex-direction:column}
  .admin-access-actions>.btn{width:100%}
 }
+
+
+/* BAZOO save-result receipt — confirmed server write, always visible */
+.admin-save-confirmation{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ padding:13px 16px;
+ border:1px solid #c6e7d4;
+ border-right:4px solid #339b69;
+ border-radius:12px;
+ background:#f5fcf8;
+ color:#285c40;
+ font-size:13px;
+ font-weight:900;
+ line-height:1.8;
+ margin-bottom:16px;
+ overflow-wrap:anywhere;
+}
+.admin-save-confirmation button{
+ appearance:none;
+ border:1px solid #c6e7d4;
+ background:#fff;
+ border-radius:8px;
+ color:#326c4d;
+ min-width:30px;
+ height:30px;
+ font-weight:900;
+ cursor:pointer;
+}
+.admin-access-notice strong{direction:ltr;unicode-bidi:plaintext}
