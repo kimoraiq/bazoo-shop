@@ -317,3 +317,69 @@ body{background:#fbfafc;color:var(--ink)}
 .shell-cat-row a>span>.svg-icon{width:36px;height:36px}
 }
 @media(prefers-reduced-motion:reduce){.merch-slider *{transition:none!important}}
+
+
+/* BAZOO release: rigid carousel dimensions on every slide */
+.merch-slider{height:414px;min-height:0;max-height:414px}
+.merch-slider-inner{height:100%;min-height:0;max-height:100%;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.merch-content{min-width:0;height:100%;max-height:100%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;overflow:hidden;padding-top:35px;padding-bottom:61px}
+.merch-content h1{font-size:clamp(36px,4.3vw,57px);max-width:100%;line-height:1.17;max-height:2.5em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere}
+.merch-content p{font-size:15px;max-height:3.8em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;margin:0 0 18px}
+.merch-content .hero-buttons{flex-shrink:0;flex-wrap:wrap;margin-top:10px}
+.merch-visual{height:100%;min-height:0;max-height:100%;overflow:hidden}
+.merch-photo{height:82%;max-height:calc(100% - 36px);max-width:84%;object-fit:contain}
+.merch-orbit{width:min(315px,72%);aspect-ratio:1;height:auto}
+.merch-illustration{max-height:calc(100% - 60px);max-width:95%;height:260px}
+.slider-controls{bottom:16px}
+/* Branded product previews and staff controls */
+.product{position:relative}
+.prodimage{overflow:hidden}
+.prodimage img{object-fit:contain}
+.demo-label{position:absolute;top:12px;left:12px;color:#5b21b6;background:#f7f0ff;border:1px solid #dbcbfa;padding:6px 9px;border-radius:8px;font-size:11px;font-weight:900;box-shadow:0 2px 8px #2b0b6114}
+.demo-price-note{display:block;margin-top:8px;font-size:10px;color:#876c9b;font-weight:800;line-height:1.45}
+.demo-product .prodinfo{display:flex;flex-direction:column}
+.demo-product .prodfoot{margin-top:auto;padding-top:11px}
+.demo-alert{display:flex;align-items:flex-start;gap:8px;background:#fff4e9;border:1px solid #ffd8bc;color:#80512a;padding:13px;border-radius:12px;font-weight:800;font-size:13px;line-height:1.5}
+.demo-alert .svg-icon{width:18px;height:18px;flex-shrink:0}
+.detail-img{width:100%;height:285px;max-width:100%;object-fit:contain;background:#f8f5fd;border-radius:14px;margin:17px 0}
+.detail-description{line-height:1.9;white-space:pre-wrap;font-size:14px}
+.demo-product .price-row{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.admin-table td{white-space:normal}
+.admin-table td button{margin:3px 4px;border-radius:9px;padding:8px 10px}
+.admin-table td button.danger-action{background:#fff0f1;color:#a8314d;border:1px solid #fad8df}
+.admin-table td button.danger-action:hover{background:#ffe2e8}
+.admin-table .card{overflow-x:auto}
+.confirm-shell{padding-top:12px}
+.confirm-graphic{width:65px;height:65px;border-radius:20px;display:grid;place-items:center;background:#fff0ee;color:#b23b43;margin-bottom:16px}
+.confirm-graphic .svg-icon{width:34px;height:34px}
+.confirm-actions{display:flex;gap:10px;margin-top:24px}
+.confirm-actions .btn{min-width:140px}
+.confirm-actions .danger{background:#b43d52;color:#fff;border:1px solid #b43d52}
+.confirm-actions .danger:hover{background:#9e3047}
+.modal{border:1px solid #e6def0}
+.modal .stack{margin-top:16px}
+.toast{z-index:130;box-shadow:0 15px 40px #2b0d4866;background:#291145;border:1px solid #ffffff1e;font-size:13px;line-height:1.55;max-width:520px;padding:14px 20px;border-radius:13px}
+@media(max-width:950px){
+ .merch-slider{height:370px;max-height:370px}
+ .merch-content{padding:29px 29px 55px}
+ .merch-content h1{font-size:clamp(30px,4.5vw,43px)}
+ .merch-content p{font-size:13px}
+}
+@media(max-width:600px){
+ .merch-slider{height:470px;min-height:470px;max-height:470px;overflow:hidden}
+ .merch-slider-inner{height:100%;min-height:0;max-height:470px;grid-template-columns:1fr;grid-template-rows:270px 200px}
+ .merch-content{height:270px;max-height:270px;min-height:0;padding:25px 17px 9px;align-items:center;text-align:center;justify-content:flex-start}
+ .merch-content h1{font-size:31px;margin:12px 0 8px;line-height:1.15;max-height:2.45em}
+ .merch-content p{font-size:12px;line-height:1.55;max-width:330px;min-height:0;max-height:3.25em;margin:0 0 11px}
+ .merch-content .hero-buttons{margin-top:5px;justify-content:center;flex-wrap:wrap}
+ .merch-content .hero-buttons .btn{min-height:37px;font-size:11px;padding:9px 12px}
+ .merch-visual{height:198px;min-height:0}
+ .merch-illustration{max-height:176px;height:170px}
+ .merch-photo{height:88%;max-height:170px}
+ .merch-orbit{max-height:165px;width:165px}
+ .slider-controls{bottom:8px}
+ .confirm-actions .btn{min-width:0;flex:1}
+ .demo-label{font-size:9px;top:8px;left:7px;padding:4px 6px}
+ .demo-price-note{font-size:9px}
+ .admin-table td button{margin:2px;padding:7px 8px}
+}
