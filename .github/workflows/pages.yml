@@ -34,7 +34,6 @@ jobs:
           node admin-controls-test.cjs
           node admin-auth-test.cjs
           node admin-persistence-test.cjs
-          node admin-persistence-test.cjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
