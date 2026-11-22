@@ -149,7 +149,7 @@ async function reload(){
 function action(kind,table,id,label,cls="secondary"){return '<button type="button" class="button mini '+cls+'" data-action="'+kind+'" data-table="'+table+'" data-id="'+html(id)+'">'+glyph(ICON_ACTION[kind]||"settings")+label+'</button>'}
 function imageCell(url){return url&&safeUrl(url)?'<img class="image-thumb" src="'+safeUrl(url)+'" alt="صورة المنتج" loading="lazy">':'—'}
 function productRows(){
- return (state.records.products||[]).map(p=>'<tr><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
+ return (state.records.products||[]).map(p=>'<tr data-filter-text="'+html((p.name+" "+(p.sku||"")).toLowerCase())+'"><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
 }
 function table(columns,body){return '<div class="surface table-wrap"><table class="data-table"><thead><tr>'+columns.map(x=>'<th>'+x+'</th>').join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>'}
 function statCard(label,num,ico,note=""){
@@ -184,7 +184,7 @@ function renderProducts(){
  +statCard("المنتجات المنشورة",rows.filter(x=>x.active).length,"check-circle","تظهر في المتجر")
  +statCard("المنتجات المخفية",rows.filter(x=>!x.active).length,"eye-off","غير ظاهرة للعملاء")
  +statCard("العروض الحالية",rows.filter(x=>x.on_sale).length,"percent","منتجات ضمن العروض")+'</div>'
- +'<div class="section-head"><div><h2>إدارة المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div>'
+ +'<div class="section-head"><div><h2>إدارة المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><div class="section-tools"><label class="search-box">'+glyph("search")+'<input type="search" class="input" id="productSearch" placeholder="ابحث عن منتج أو رمز..." aria-label="بحث في المنتجات"></label><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div></div>'
  +table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
 }
 function renderTaxonomy(tableName){
@@ -265,8 +265,8 @@ function showProduct(id){
   textField("الوصف","description",p.description||"")+
   textField("المواصفات: اكتب المفتاح: القيمة لكل سطر","specs",spec)+
   sectionHeading("صور المنتج","رفع مباشر مع ضغط تلقائي","image")+
-  '<label class="field">الصورة الرئيسية<input name="coverPhoto" type="file" class="input" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">ضغط تلقائي إلى 15 كيلوبايت؛ الصورة القديمة محفوظة ما لم ترفع صورة جديدة.</span></label>'+
-  '<label class="field">صور إضافية<input name="photos" type="file" class="input" multiple accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حتى 8 صور إضافية، 15 كيلوبايت للصورة.</span></label>'+
+  '<label class="field file-picker"><span>الصورة الرئيسية</span><span class="file-preview" data-file-preview="coverPhoto">'+(p.image_url&&safeUrl(p.image_url)?'<img src="'+safeUrl(p.image_url)+'" alt="الصورة الحالية للمنتج">':glyph("image")+'<small>معاينة الصورة هنا</small>')+'</span><input name="coverPhoto" type="file" class="input" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">ضغط تلقائي إلى 15 كيلوبايت؛ تبقى الصورة القديمة إذا لم ترفع بديلاً.</span></label>'+
+  '<label class="field file-picker"><span>صور إضافية</span><span class="file-preview file-preview-multiple" data-file-preview="photos">'+glyph("image")+'<small>رفع مجموعة الصور</small></span><input name="photos" type="file" class="input" multiple accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حتى 8 صور إضافية، 15 كيلوبايت للصورة.</span></label>'+
   '<input type="hidden" name="id" value="'+html(p.id||"")+'">'+formFooter("حفظ المنتج")
  ),"product:"+String(p.id||"new"));
 }
@@ -299,8 +299,8 @@ function showPromo(id){
  booleanSelect("صورة جاهزة تحتوي التصميم","artwork_only",p.artwork_only!==false)+
  booleanSelect("إعلان تجريبي","is_demo",p.is_demo===true)+
  sectionHeading("الصور الإعلانية","نسخة للحاسوب ونسخة للهاتف","image")+
- '<label class="field">صورة الحاسوب (1440 × 480)<input name="desktop" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
- '<label class="field">صورة الهاتف (720 × 900)<input name="mobile" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
+ '<label class="field file-picker">صورة الحاسوب (1440 × 480)<span class="file-preview file-preview-banner" data-file-preview="desktop">'+(p.desktop_image_url&&safeUrl(p.desktop_image_url)?'<img src="'+safeUrl(p.desktop_image_url)+'" alt="الإعلان الحالي للحاسوب">':glyph("image")+'<small>تصميم الحاسوب</small>')+'</span><input name="desktop" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
+ '<label class="field file-picker">صورة الهاتف (720 × 900)<span class="file-preview file-preview-banner" data-file-preview="mobile">'+(p.mobile_image_url&&safeUrl(p.mobile_image_url)?'<img src="'+safeUrl(p.mobile_image_url)+'" alt="الإعلان الحالي للهاتف">':glyph("image")+'<small>تصميم الهاتف</small>')+'</span><input name="mobile" class="input" type="file" accept="image/jpeg,image/png,image/webp"><span class="upload-hint">حد أقصى 1 ميغابايت بعد الضغط</span></label>'+
  '<input type="hidden" name="id" value="'+html(p.id||"")+'">'+formFooter("حفظ الإعلان")
  ),"promo:"+String(p.id||"new"));
 }
@@ -560,10 +560,31 @@ async function onSubmit(event){
  finally{form.dataset.pending="false";if(button)button.disabled=false}
 }
 document.addEventListener("submit",onSubmit,true);
-document.addEventListener("input",event=>{if(event.target.closest("#dialogBody form"))saveDraft()},true);
+document.addEventListener("input",event=>{
+ if(event.target.id==="productSearch"){
+  const term=String(event.target.value||"").trim().toLowerCase();
+  for(const row of document.querySelectorAll(".data-table tbody tr[data-filter-text]"))row.hidden=!!term&&!row.dataset.filterText.includes(term);
+  return;
+ }
+ if(event.target.closest("#dialogBody form"))saveDraft();
+},true);
+function updateFilePreview(input){
+ if(!input?.files)return;
+ const preview=input.closest(".file-picker")?.querySelector(".file-preview");
+ if(!preview)return;
+ const files=Array.from(input.files);
+ if(!files.length)return;
+ const first=files[0],url=URL.createObjectURL(first);
+ preview.innerHTML='<img alt="معاينة الصورة المرفوعة" src="'+url+'"><small>'+html(files.length>1?files.length+" صور محددة":first.name)+'</small>';
+ preview.querySelector("img")?.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+}
+
 document.addEventListener("change",async event=>{
  const control=event.target;
- if(!control.matches(".order-status,.order-item-status")){if(control.closest("#dialogBody form"))saveDraft();return}
+ if(!control.matches(".order-status,.order-item-status")){
+  if(control.type==="file"&&control.closest("#dialogBody"))updateFilePreview(control);
+  if(control.closest("#dialogBody form"))saveDraft();return
+ }
  const previous=control.dataset.current;control.disabled=true;clearAlert();
  try{
   const msg=await saveOrder(control);if(msg){alertUser(msg,"success");await reload()}
@@ -574,7 +595,7 @@ document.addEventListener("click",async event=>{
  const node=event.target.closest("[data-action],[data-tab]");
  if(!node)return;
  if(node.dataset.tab){
-  if(!can(node.dataset.tab)&&node.dataset.tab!=="members")return alertUser("هذه الصلاحية غير مفعّلة.");
+  if(node.dataset.tab==="members"?state.role!=="owner":!can(node.dataset.tab))return alertUser("هذه الصلاحية غير مفعّلة.");
   state.tab=node.dataset.tab;
   const sidebar=byId("adminSidebar"),backdrop=byId("sidebarBackdrop"),toggle=byId("menuToggle");
   if(sidebar?.classList)sidebar.classList.remove("mobile-open");
