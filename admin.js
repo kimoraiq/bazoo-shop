@@ -377,7 +377,7 @@ function showPromoEditor(id){
   +'<label class="formgroup">نمط العرض<select name="artwork_only" class="field"><option value="true" '+(p.artwork_only!==false?"selected":"")+'>تصميم إعلان جاهز (الصورة تحتوي النصوص والمنتجات)</option><option value="false" '+(p.artwork_only===false?"selected":"")+'>صورة مع عنوان وزر من الموقع</option></select></label>'
   +'<label class="formgroup">منتج مرتبط بالبنر (اختياري)<select class="field" name="product_id"><option value="">بنر عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
-  +'<p class="note">ارفع البنر المصمّم النهائي من فريق التصميم، بنسختين منفصلتين. يتم الحفاظ على محتوى الصورة بالكامل داخل القياس الثابت، بدون اقتطاع النصوص أو المنتجات.</p>'
+  +'<p class="note">ارفع البنر المصمّم النهائي من فريق التصميم، بنسختين منفصلتين. تنضغط كل صورة بنر إلى 15 كيلوبايت كحد أقصى؛ قد تتأثر دقة النصوص والتفاصيل بسبب هذا الحد الصارم.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<div class="formgrid"><label class="formgroup">مكان الظهور<select name="placement" class="field">'+[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.placement||"home")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<label class="formgroup">ترتيب العرض<input type="number" name="sort_order" min="0" max="9999" class="field" value="'+esc(p.sort_order??0)+'"></label>'
@@ -387,13 +387,21 @@ function showPromoEditor(id){
  const f=document.querySelector("#adminPromoForm");
  for(const type of ["desktop","mobile"]){
   const input=f.elements["photo_"+type];
-  input.addEventListener("change",()=>{
+  input.addEventListener("change",async()=>{
    const file=input.files?.[0],preview=document.getElementById("preview-"+type);
-   if(!file)return;
-   if(!["image/jpeg","image/png","image/webp"].includes(file.type)){notify("صيغة الصورة غير مدعومة");input.value="";return}
-   const url=URL.createObjectURL(file);
-   preview.innerHTML='<img alt="معاينة البنر" src="'+url+'">';
-   preview.querySelector("img").addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+   if(!file||!preview)return;
+   preview.innerHTML='<span class="media-compress-progress">جاري ضغط البنر...</span>';
+   try{
+    const optimized=await prepareBannerPhoto(file,type);
+    if(input.files?.[0]!==file||!preview.isConnected)return;
+    const url=URL.createObjectURL(optimized);
+    preview.innerHTML='<img alt="معاينة البنر المضغوط" src="'+url+'"><span class="media-size-ok">بعد الضغط: '+humanKb(optimized.size)+'</span>';
+    preview.querySelector("img")?.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+   }catch(err){
+    if(input.files?.[0]!==file)return;
+    preview.innerHTML='<span class="media-size-error">'+esc(err.message)+'</span>';
+    notify(err.message);
+   }
   });
  }
 }
@@ -418,12 +426,24 @@ async function cropBanner(file,width,height){
   return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error("تعذّر حفظ الصورة")),"image/jpeg",.88));
  }finally{URL.revokeObjectURL(objectUrl)}
 }
+const preparedBanners=new WeakMap();
+function prepareBannerPhoto(file,type){
+ if(!file?.size)return Promise.resolve(null);
+ if(!preparedBanners.has(file)){
+  const dims=type==="desktop"?[1440,480]:[720,900];
+  preparedBanners.set(file,(async()=>{
+   const composited=await cropBanner(file,...dims);
+   return await compressSiteImage(composited,dims[0],dims[1]);
+  })());
+ }
+ return preparedBanners.get(file);
+}
 async function uploadBannerPhoto(file,type){
  if(!file?.size)return null;
- const dims=type==="desktop"?[1440,480]:[720,900];
- const blob=await cropBanner(file,...dims);
- const name="promotions/"+type+"/"+crypto.randomUUID()+".jpg";
- const {error}=await sb.storage.from("product-images").upload(name,blob,{contentType:"image/jpeg"});
+ const blob=await prepareBannerPhoto(file,type);
+ if(blob.size>MAX_IMAGE_BYTES)throw Error("حجم البنر تجاوز 15 كيلوبايت بعد الضغط");
+ const name="promotions/"+type+"/"+crypto.randomUUID()+"."+imageExtension(blob);
+ const {error}=await sb.storage.from("product-images").upload(name,blob,{contentType:blob.type,cacheControl:"31536000"});
  if(error)throw Error(error.message);
  return sb.storage.from("product-images").getPublicUrl(name).data.publicUrl;
 }
