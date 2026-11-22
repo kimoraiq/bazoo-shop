@@ -24,6 +24,7 @@ jobs:
           node --check app.js
           node --check admin.js
           node --check client.js
+          node --check bundle.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
