@@ -1,4 +1,4 @@
-/* BAZOO verified product persistence, direct form save and safe admin writes */
+/* BAZOO product-save integrity: old images untouched, verified writes */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -569,7 +569,8 @@ async function saveProduct(form){
   }
   const gallery=state.productImages.filter(p=>p.product_id===savedRecord.id);
   const existingURLs=new Set(gallery.map(x=>x.image_url));
-  if(!gallery.length&&savedRecord.image_url&&!uploaded.includes(savedRecord.image_url))uploaded.unshift(savedRecord.image_url);
+  // Existing cover URLs do not need another gallery INSERT when only editing product details.
+  // Add only image files explicitly selected during this save.
   const additions=uploaded.filter(url=>!existingURLs.has(url));
   if(additions.length){
    const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
