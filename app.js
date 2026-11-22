@@ -14,7 +14,17 @@ try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
 function persist(){try{localStorage.setItem("bazoo_cart_v2",JSON.stringify(state.cart));localStorage.setItem("bazoo_favs_v2",JSON.stringify(state.favs))}catch(e){};$("#cartBadge").textContent=Object.values(state.cart).reduce((s,n)=>s+Number(n||0),0)||""}
-function notify(msg){const x=$("#toast");x.textContent=msg;x.classList.add("show");clearTimeout(notify.timer);notify.timer=setTimeout(()=>x.classList.remove("show"),3800)}
+function notify(msg){
+ const message=String(msg||"");
+ if(state.route==="admin"&&/^(تم|تعذّر|لم |حُفظ|خطأ)/.test(message)){
+  state.adminFeedback=message;
+  const panel=$("#adminSaveFeedback");
+  if(panel){panel.hidden=false;panel.textContent=message;panel.classList.toggle("admin-save-failure",/^(تعذّر|لم |خطأ)/.test(message))}
+ }
+ const x=$("#toast");x.textContent=message;x.classList.add("show");
+ clearTimeout(notify.timer);
+ notify.timer=setTimeout(()=>x.classList.remove("show"),5000);
+}
 function openModal(title,html){$("#modalTitle").textContent=title;$("#modalBody").innerHTML=html;$("#modalBody").querySelectorAll("form").forEach(f=>f.noValidate=true);$("#modal").classList.add("show");$("#modalBackdrop").classList.add("show");document.body.style.overflow="hidden"}
 function closeModal(){$("#modal").classList.remove("show");$("#modalBackdrop").classList.remove("show");document.body.style.overflow=""}
 $("#closeModal").onclick=closeModal;$("#modalBackdrop").onclick=closeModal;document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
@@ -360,7 +370,9 @@ function renderCategoryNav(){
   +'<button class="category-nav-link" data-go="brands">'+icon("tag",18)+' العلامات التجارية</button><button class="category-nav-link" data-go="offers">'+icon("percent",18)+' العروض</button><button class="category-nav-link nav-admin-entry" data-go="market">'+icon("store",18)+' أضف متجرك</button>';
  root.innerHTML=links;
 }
+let catalogLoadVersion=0;
 async function loadCatalog(){
+ const thisLoad=++catalogLoadVersion;
  const requests=[
   ["categories",()=>sb.from("categories").select("*").order("sort_order")],
   ["brands",()=>sb.from("brands").select("*").order("name")],
@@ -374,6 +386,7 @@ async function loadCatalog(){
   if(result.error)throw Error(name+": "+result.error.message);
   return result.data||[];
  }));
+ if(thisLoad!==catalogLoadVersion)return false; // A newer load must never be overwritten by stale responses.
  let failed=false;
  results.forEach((out,i)=>{
   if(out.status==="fulfilled")state[requests[i][0]]=out.value;
@@ -489,7 +502,31 @@ document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.
 let searchDebounce;document.addEventListener("input",e=>{
  if(e.target.id==="provinceSearch"){const q=e.target.value.trim();document.querySelectorAll(".province-item").forEach(x=>x.hidden=!x.textContent.includes(q));return}
  if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
-document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target);if(id==="adminMemberForm")await saveMember(e.target)});
+// Prevent browser navigation for every admin form, even if a later handler errors.
+document.addEventListener("submit",e=>{
+ const id=e.target?.id||"";
+ if(id==="searchForm"||id==="authForm"||id==="orderForm"||id.startsWith("admin"))e.preventDefault();
+},true);
+document.addEventListener("submit",async e=>{
+ const form=e.target,id=form?.id||"";
+ if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}
+ if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;
+ e.preventDefault();
+ if(form.dataset?.saveInProgress==="true")return;
+ if(!validateSiteForm(form))return;
+ if(form.dataset)form.dataset.saveInProgress="true";
+ try{
+  if(id==="authForm")await authSubmit(form);
+  else if(id==="orderForm")await submitOrder(form);
+  else if(id==="adminProductForm")await saveProduct(form);
+  else if(id==="adminPromoForm")await savePromo(form);
+  else if(id==="adminTaxonomyForm")await saveTaxonomy(form);
+  else if(id==="adminMemberForm")await saveMember(form);
+ }catch(error){
+  console.error("BAZOO save error:",error);
+  notify("تعذّر إتمام الحفظ: "+(error?.message||"حدث خطأ غير متوقع."));
+ }finally{if(form.dataset)delete form.dataset.saveInProgress}
+});
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",()=>{if(!pendingScroll)pendingScroll="#app";render()});
