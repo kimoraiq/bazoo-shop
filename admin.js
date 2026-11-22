@@ -8,6 +8,99 @@ function calculateDiscount(original,percent){
  if(pct>0&&(base<1||finalPrice<1||finalPrice>=base))return null;
  return {original:base,percentage:pct,price:finalPrice,saved:base-finalPrice};
 }
+
+/* Every newly uploaded BAZOO photo must be <= 15 KiB (15360 bytes). */
+const MAX_IMAGE_BYTES=15*1024;
+const MAX_ORIGINAL_BYTES=25*1024*1024;
+const optimizedImages=new WeakMap();
+function humanKb(bytes){return (bytes/1024).toFixed(1)+" كيلوبايت"}
+async function compressSiteImage(file,maxWidth=1400,maxHeight=1400){
+ if(!file||!file.size)throw Error("الصورة فارغة أو غير صالحة");
+ if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("الصورة لازم تكون JPG أو PNG أو WEBP");
+ if(file.size>MAX_ORIGINAL_BYTES)throw Error("حجم الصورة الأصلية أكبر من 25 ميگابايت");
+ if(file.size<=MAX_IMAGE_BYTES)return file;
+ const originalURL=URL.createObjectURL(file);
+ try{
+  const source=await new Promise((resolve,reject)=>{
+   const img=new Image();
+   img.onload=()=>resolve(img);
+   img.onerror=()=>reject(Error("تعذّرت قراءة الصورة، جرّب صورة ثانية"));
+   img.src=originalURL;
+  });
+  const ow=source.naturalWidth||source.width,oh=source.naturalHeight||source.height;
+  if(!ow||!oh||ow*oh>50000000)throw Error("دقة الصورة كبيرة جداً أو غير صالحة");
+  const initial=Math.min(1,maxWidth/ow,maxHeight/oh);
+  const baseW=Math.max(1,Math.round(ow*initial)),baseH=Math.max(1,Math.round(oh*initial));
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d");
+  if(!ctx)throw Error("المتصفح لا يدعم ضغط الصور");
+  const encode=(quality,type)=>new Promise((resolve,reject)=>{
+   canvas.toBlob(blob=>blob?resolve(blob):reject(Error("تعذّر تجهيز الصورة")),type,quality);
+  });
+  const scales=[1,.82,.67,.54,.43,.34,.27,.21,.16,.12,.09,.07,.05,.035];
+  for(const scale of scales){
+   canvas.width=Math.max(1,Math.round(baseW*scale));
+   canvas.height=Math.max(1,Math.round(baseH*scale));
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   ctx.drawImage(source,0,0,canvas.width,canvas.height);
+   let type="image/webp";
+   let draft=await encode(.35,type);
+   if(draft.type!=="image/webp"){
+    type="image/jpeg";
+    ctx.globalCompositeOperation="destination-over";
+    ctx.fillStyle="#fff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.globalCompositeOperation="source-over";
+    draft=await encode(.35,type);
+   }
+   let lowQuality=.35,highQuality=.88;
+   if(draft.size>MAX_IMAGE_BYTES){
+    draft=await encode(.12,type);
+    if(draft.size>MAX_IMAGE_BYTES)continue;
+    lowQuality=.12;
+    highQuality=.35;
+   }
+   let best=draft;
+   for(let k=0;k<5;k++){
+    const quality=(lowQuality+highQuality)/2;
+    const candidate=await encode(quality,type);
+    if(candidate.size<=MAX_IMAGE_BYTES){
+     best=candidate;lowQuality=quality;
+    }else highQuality=quality;
+   }
+   if(best.size<=MAX_IMAGE_BYTES)return best;
+  }
+  throw Error("ما گدرنا نضغط الصورة إلى 15 كيلوبايت. جرّب صورة أبسط أو بدقة أقل.");
+ }finally{URL.revokeObjectURL(originalURL)}
+}
+function optimizedImage(file,maxWidth=1400,maxHeight=1400){
+ if(!optimizedImages.has(file))optimizedImages.set(file,compressSiteImage(file,maxWidth,maxHeight));
+ return optimizedImages.get(file);
+}
+function imageExtension(blob){
+ return blob.type==="image/webp"?"webp":blob.type==="image/png"?"png":"jpg";
+}
+async function uploadProductImage(file){
+ const optimized=await optimizedImage(file);
+ if(optimized.size>MAX_IMAGE_BYTES)throw Error("الصورة المضغوطة تجاوزت 15 كيلوبايت");
+ const ext=imageExtension(optimized);
+ const path="products/"+crypto.randomUUID()+"."+ext;
+ const res=await sb.storage.from("product-images").upload(path,optimized,{contentType:optimized.type,cacheControl:"31536000"});
+ if(res.error)throw Error(res.error.message);
+ return sb.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+}
+function previewMediaUpload(file,target,showBytes=true){
+ if(!file||!target)return;
+ target.innerHTML='<span class="media-compress-progress">جاري ضغط الصورة إلى 15 كيلوبايت...</span>';
+ optimizedImage(file).then(blob=>{
+  if(!target.isConnected)return;
+  const url=URL.createObjectURL(blob);
+  target.innerHTML='<img alt="معاينة الصورة بعد الضغط" src="'+url+'">'+(showBytes?'<span class="media-size-ok">جاهزة للرفع • '+humanKb(blob.size)+'</span>':'');
+  const img=target.querySelector("img");
+  img?.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+ }).catch(err=>{if(target.isConnected)target.innerHTML='<span class="media-size-error">'+esc(err.message)+'</span>'});
+}
+
 function editor(p={}){
  const existing=state.productImages.filter(x=>x.product_id===p.id).sort((a,b)=>a.sort_order-b.sort_order);
  const specs=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications).map(([a,b])=>a+": "+b).join("\n"):"";
@@ -31,10 +124,13 @@ function editor(p={}){
  +'<label class="formgroup">رمز المنتج SKU<input name="sku" class="field" value="'+esc(p.sku||"")+'"></label>'
  +'<label class="formgroup fullspan">وصف المنتج<textarea name="description" class="field" rows="4">'+esc(p.description||"")+'</textarea></label>'
  +'<label class="formgroup fullspan">المواصفات <span class="form-help">كل مواصفة بسطر، مثال: اللون: أسود</span><textarea name="specifications" class="field" rows="4" placeholder="اللون: أسود&#10;الموديل: ...">'+esc(specs)+'</textarea></label>'
- +'<div class="fullspan image-editor"><div class="image-editor-heading">'+icon("image",22)+' <div><h3>صور المنتج</h3><p>ارفع حتى 8 صور جديدة دفعة وحدة، وتگدر تغيّر الصورة الرئيسية وترتيب الصور.</p></div></div>'
- +(p.id?gallery:'<p class="subtle">صور المنتج تظهر هنا بعد حفظه أول مرة.</p>')
- +'<label class="formgroup">رفع صور متعددة JPG / PNG / WEBP — 5MB للصورة<input class="field" type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photoUploadPreview" class="photo-upload-preview"></div>'
- +'<label class="formgroup">رابط الصورة الرئيسية (اختياري)<input name="image_url" class="field" value="'+esc(p.image_url||"")+'" placeholder="https://..."></label></div>'
+ +'<div class="fullspan image-editor"><div class="image-editor-heading">'+icon("image",22)+' <div><h3>صور المنتج</h3><p>كل صورة تنضغط تلقائياً إلى 15 كيلوبايت أو أقل قبل رفعها.</p></div></div>'
+ +'<div class="main-photo-editor"><div class="main-photo-heading"><strong>'+icon("image",18)+' الصورة الرئيسية للمنتج *</strong><small>ارفع الصورة من جهازك، مو رابط. تگدر تبدّلها بأي وقت.</small></div>'
+ +'<div class="main-photo-preview" id="mainPhotoPreview">'+(safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="الصورة الرئيسية الحالية"><span class="media-existing-label">الصورة الحالية</span>':'<span class="empty-media-preview">'+icon("image",28)+' اختر الصورة الرئيسية</span>')+'</div>'
+ +'<label class="main-photo-picker">'+icon("upload",17)+' <span>اختيار صورة رئيسية من الجهاز</span><input type="file" name="coverPhoto" accept="image/jpeg,image/png,image/webp" aria-label="اختيار الصورة الرئيسية للمنتج"></label></div>'
+ +(p.id?gallery:'<p class="subtle">الصور الإضافية تظهر هنا بعد حفظ المنتج.</p>')
+ +'<label class="formgroup">صور إضافية (حتى 8 صور) — تُضغط تلقائياً إلى 15 كيلوبايت<input class="field" type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photoUploadPreview" class="photo-upload-preview"></div>'
+ +'<p class="media-upload-advice">حدّ الصور 15 كيلوبايت صارم، لذلك بعض الصور عالية التفاصيل والبنرات قد تقل دقتها بشكل ملحوظ بعد الضغط.</p></div>'
  +'<label class="formgroup">نوع المنتج<select name="is_demo" class="field"><option value="false">منتج قابل للطلب</option><option value="true">نموذج للعرض فقط</option></select></label>'
  +'<label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label>'
  +'<label class="formgroup">منتج مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
