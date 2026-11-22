@@ -1467,7 +1467,7 @@ body{background:#fbfafc;color:var(--ink)}
 
 
 /* BAZOO directed navigation: smooth in-page focus with sticky-header offsets */
-html{scroll-behavior:smooth;scroll-padding-top:120px}
+html{scroll-behavior:smooth}
 #app,
 #catalogFilters,
 #categoryResults,
@@ -1479,11 +1479,9 @@ html{scroll-behavior:smooth;scroll-padding-top:120px}
 }
 #catalogFilters,#categoryResults,#adminTabContent{position:relative}
 @media(max-width:830px){
-  html{scroll-padding-top:118px}
   #app,#catalogFilters,#categoryResults,#adminTabContent,.home-section,.product-detail-grid,.adminnav{scroll-margin-top:118px}
 }
 @media(max-width:600px){
-  html{scroll-padding-top:126px}
   #app,#catalogFilters,#categoryResults,#adminTabContent,.home-section,.product-detail-grid,.adminnav{scroll-margin-top:126px}
 }
 @media(prefers-reduced-motion:reduce){
