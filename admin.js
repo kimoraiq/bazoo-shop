@@ -331,6 +331,7 @@ function setProductSaveStatus(form,message,type="error"){
 function getProductPriceInfo(form){
  const original=form.elements.original_price_iqd?.value??"";
  const percent=form.elements.discount_percent?.value??"";
+ if(String(original).trim()==="")throw Error("يرجى إدخال السعر الأصلي قبل الحفظ.");
  const value=calculateDiscount(original,percent===""?0:percent);
  if(!value)throw Error("تحقق من السعر الأصلي ونسبة الخصم (من 0% إلى 99%)، ويجب أن يكون السعر بعد الخصم أكبر من صفر.");
  return value;
