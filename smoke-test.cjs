@@ -63,8 +63,11 @@ const context={
 (async()=>{
  vm.runInNewContext(source,context,{timeout:10000});
  assert.match(node("#app").innerHTML,/merch-slider/,"homepage not rendered");
- assert.match(node("#app").innerHTML,/home-categories/,"category circles missing");
+ assert.match(node("#app").innerHTML,/bazoo-cat-grid/,"branded category grid missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
+ assert.equal((node("#app").innerHTML.match(/class="bazoo-cat-tile"/g)||[]).length,6,"homepage must not show dozens of categories at once");
+ assert.match(node("#app").innerHTML,/data-home-category-group="featured"/,"category tabs missing");
+ assert.match(node("#app").innerHTML,/data-home-category-more="1"/,"progressive category reveal missing");
  assert.match(html,/إلى جميع أنحاء العراق/,"correct nationwide delivery text missing");
  assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
@@ -78,7 +81,7 @@ const context={
  assert.match(source,/photo_desktop/,"desktop admin file input missing");
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
- assert.match(source,/category-photo-grid/,"circular linked category gallery missing");
+ assert.match(source,/bazoo-cat-tile/,"compact linked category cards missing");
  assert.match(html,/bundle\.js\?v=20\d{6}[a-z0-9-]+/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
