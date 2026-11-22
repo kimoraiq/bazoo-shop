@@ -357,58 +357,87 @@ async function saveDiscountOnly(form){
  finally{if(btn)btn.disabled=false}
 }
 async function saveProduct(form){
- const f=new FormData(form),id=String(f.get("id")||"");
- const priceInfo=calculateDiscount(f.get("original_price_iqd"),f.get("discount_percent")||0);
- if(!priceInfo)return notify("تحقق من السعر الأصلي ونسبة الخصم. يجب أن يكون السعر النهائي أكبر من صفر، وأن تتراوح نسبة الخصم بين 0% و99%.");
- const specs={};
- for(const line of String(f.get("specifications")||"").split("\n")){
-  const i=line.indexOf(":");if(i<1)continue;
-  const key=line.slice(0,i).trim(),value=line.slice(i+1).trim();
-  if(key&&value)specs[key.slice(0,90)]=value.slice(0,300);
- }
- const v={name:String(f.get("name")).trim(),category_id:Number(f.get("category_id")),
-  brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
-  price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
-  stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,
-  description:String(f.get("description")||""),specifications:specs,
-  image_url:state.products.find(p=>p.id===id)?.image_url||null,
-  active:f.get("active")==="true",featured:f.get("featured")==="true",
-  on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",is_demo:f.get("is_demo")==="true"};
- if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
- const mainFile=form.elements.coverPhoto?.files?.[0]||null;
- const photos=Array.from(form.elements.photos.files||[]);
- if(photos.length>8)return notify("الحد الأقصى 8 صور إضافية");
- if(!mainFile&&!v.image_url)return notify("يرجى رفع صورة رئيسية من جهازك قبل حفظ المنتج.");
- const btn=form.querySelector('button[type="submit"]');btn.disabled=true;
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit?.disabled)return;
+ if(submit)submit.disabled=true;
+ let savedRecord=null;
  try{
-  const newlyUploaded=[];
+  const f=new FormData(form);
+  const id=String(f.get("id")||"").trim();
+  const priceInfo=getProductPriceInfo(form);
+  const name=String(f.get("name")||"").trim();
+  const category=Number(f.get("category_id"));
+  const stock=Number(f.get("stock"));
+  if(name.length<2||name.length>180)throw Error("يرجى إدخال اسم منتج صحيح لا يتجاوز 180 حرفاً.");
+  if(!Number.isSafeInteger(category)||category<1)throw Error("يرجى اختيار قسم المنتج.");
+  if(!Number.isSafeInteger(stock)||stock<0)throw Error("يرجى إدخال كمية صحيحة للمخزون.");
+  const photos=Array.from(form.elements.photos?.files||[]);
+  if(photos.length>8)throw Error("يمكن رفع ثماني صور إضافية كحد أقصى.");
+  const mainFile=form.elements.coverPhoto?.files?.[0]||null;
+  const specs={};
+  for(const line of String(f.get("specifications")||"").split("\n")){
+   const i=line.indexOf(":");if(i<1)continue;
+   const key=line.slice(0,i).trim(),value=line.slice(i+1).trim();
+   if(key&&value)specs[key.slice(0,90)]=value.slice(0,300);
+  }
+  const current=state.products.find(p=>p.id===id);
+  const v={
+   name,category_id:category,brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
+   price_iqd:priceInfo.price,
+   compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
+   stock,sku:String(f.get("sku")||"").trim()||null,
+   description:String(f.get("description")||""),specifications:specs,
+   image_url:current?.image_url||null,
+   active:f.get("active")==="true",featured:f.get("featured")==="true",
+   on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",
+   is_demo:f.get("is_demo")==="true"
+  };
+  if(submit)submit.textContent="جارٍ حفظ بيانات المنتج والسعر...";
+  // Save all product and discount fields before processing images. A failed photo
+  // upload must never discard a successful price edit or product creation.
+  const stored=id?await sb.from("products").update(v).eq("id",id).select("*").single()
+                 :await sb.from("products").insert(v).select("*").single();
+  if(stored.error||!stored.data)throw Error(stored.error?.message||"لم تؤكد قاعدة البيانات حفظ المنتج.");
+  savedRecord=stored.data;
+  if(form.elements.id)form.elements.id.value=savedRecord.id;
+  state.editProduct=savedRecord.id;
+  const uploaded=[];
   if(mainFile){
-   btn.textContent="جارٍ ضغط الصورة الرئيسية ورفعها...";
-   v.image_url=await uploadProductImage(mainFile);
-   newlyUploaded.push(v.image_url);
+   if(submit)submit.textContent="جارٍ ضغط الصورة الرئيسية ورفعها...";
+   const coverURL=await uploadProductImage(mainFile);
+   uploaded.push(coverURL);
+   const coverUpdate=await sb.from("products").update({image_url:coverURL}).eq("id",savedRecord.id).select("id,image_url").single();
+   if(coverUpdate.error||!coverUpdate.data)throw Error("تم حفظ المنتج، لكن تعذّر تحديث صورته الرئيسية: "+(coverUpdate.error?.message||"تعذّر التأكيد."));
   }
   for(let i=0;i<photos.length;i++){
-   btn.textContent="جارٍ ضغط الصورة ورفعها "+(i+1)+" من "+photos.length;
-   const photoURL=await uploadProductImage(photos[i]);
-   newlyUploaded.push(photoURL);
+   if(submit)submit.textContent="جارٍ ضغط ورفع الصورة "+(i+1)+" من "+photos.length+"...";
+   uploaded.push(await uploadProductImage(photos[i]));
   }
-  const saved=id?await sb.from("products").update(v).eq("id",id).select("*").single()
-    :await sb.from("products").insert(v).select("*").single();
-  if(saved.error)throw Error(saved.error.message);
-  const record=saved.data;
-  const gallery=state.productImages.filter(x=>x.product_id===record.id);
+  const gallery=state.productImages.filter(p=>p.product_id===savedRecord.id);
   const existingURLs=new Set(gallery.map(x=>x.image_url));
-  if(!gallery.length&&record.image_url&&!newlyUploaded.includes(record.image_url))newlyUploaded.unshift(record.image_url);
-  const additions=newlyUploaded.filter(url=>!existingURLs.has(url));
+  if(!gallery.length&&savedRecord.image_url&&!uploaded.includes(savedRecord.image_url))uploaded.unshift(savedRecord.image_url);
+  const additions=uploaded.filter(url=>!existingURLs.has(url));
   if(additions.length){
    const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
-   const rows=additions.map((url,i)=>({product_id:record.id,image_url:url,alt_text:v.name,sort_order:maxOrder+i+1}));
-   const res=await sb.from("product_images").insert(rows);
-   if(res.error)throw Error("تم حفظ المنتج لكن تعذّر تسجيل بعض الصور: "+res.error.message);
+   const rows=additions.map((url,i)=>({product_id:savedRecord.id,image_url:url,alt_text:name,sort_order:maxOrder+i+1}));
+   const result=await sb.from("product_images").insert(rows);
+   if(result.error)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+result.error.message);
   }
-  await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج وصوره بعد ضغطها إلى 15 كيلوبايت");render();
- }catch(e){notify("تعذّر الحفظ: "+e.message);await loadCatalog();}
- finally{btn.disabled=false;btn.innerHTML=icon("check",18)+" حفظ المنتج وصوره";}
+  await loadCatalog();
+  state.editProduct=null;
+  notify("تم حفظ المنتج والسعر والخصم بنجاح.");
+  await render();
+ }catch(error){
+  const saved=!!savedRecord;
+  if(saved){
+   try{await loadCatalog()}catch(e){}
+   setProductSaveStatus(form,"حُفظ المنتج والسعر والخصم، ولكن حدث خطأ في معالجة الصور: "+error.message,"warning");
+  }else{
+   setProductSaveStatus(form,"تعذّر حفظ المنتج: "+error.message);
+  }
+ }finally{
+  if(submit){submit.disabled=false;submit.innerHTML=icon("check",18)+" حفظ المنتج"}
+ }
 }
 function showPromoEditor(id){
  const p=state.promos.find(x=>x.id===id)||{};
