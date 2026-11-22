@@ -1,0 +1,34 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const admin=fs.readFileSync("admin.js","utf8");
+const app=fs.readFileSync("app.js","utf8");
+const html=fs.readFileSync("index.html","utf8");
+const css=fs.readFileSync("style.css","utf8");
+
+const helper=admin.match(/function calculateDiscount\(original,percent\)\{[\s\S]*?\n\}/)?.[0];
+assert.ok(helper,"Pure discount calculation helper is missing");
+const calculate=new Function(helper+"\nreturn calculateDiscount;")();
+assert.deepEqual(calculate(100000,20),{original:100000,percentage:20,price:80000,saved:20000});
+assert.deepEqual(calculate(75000,0),{original:75000,percentage:0,price:75000,saved:0});
+assert.deepEqual(calculate(99999,25),{original:99999,percentage:25,price:74999,saved:25000});
+assert.equal(calculate(100000,100),null,"Percent over 99 must be rejected");
+assert.equal(calculate(100000,-5),null,"Negative discounts must be rejected");
+assert.equal(calculate(-1,30),null,"Negative original price must be rejected");
+assert.equal(calculate(100000,12.5),null,"Non-integer discount must be rejected");
+assert.equal(calculate(1,99),null,"Discounted price cannot fall to zero");
+
+assert.match(admin,/name="original_price_iqd"/,"Original product price input missing");
+assert.match(admin,/name="discount_percent"/,"Percentage discount input missing");
+assert.match(admin,/id="discountPreview"/,"Live discount preview missing");
+assert.match(admin,/originalInput\.addEventListener\("input",updateDiscountPreview\)/,"Original price live recalculation missing");
+assert.match(admin,/discountInput\.addEventListener\("input",updateDiscountPreview\)/,"Discount input recalculation missing");
+assert.match(admin,/price_iqd:priceInfo\.price/,"Checkout price must persist as discounted price");
+assert.match(admin,/compare_at_iqd:priceInfo\.percentage>0\?priceInfo\.original:null/,"Original price must be kept for old struck price");
+assert.match(admin,/on_sale:priceInfo\.percentage>0\|\|/,"Discounted products must be featured in sale listing");
+assert.match(app,/detail-discount-badge/,"Product page savings badge missing");
+assert.match(app,/const links=\(state\.admin\?'<button type="button" class="category-nav-link admin-top-action"/,"Admin shortcut must only be rendered for staff");
+assert.doesNotMatch(app,/data-go="admin">لوحة إدارة المتجر<\/button>/,"Old account-page admin action must be removed");
+assert.match(css,/\.category-nav \.admin-top-action\{/,"Top admin button styling missing");
+assert.match(css,/\.discount-editor\{/,"Discount editor layout missing");
+assert.match(html,/staffdiscount20/,"Update front-end cache before release");
+console.log("PASS BAZOO: role-gated top admin shortcut and percentage discounts (0–99%)");
