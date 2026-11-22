@@ -92,18 +92,26 @@ const defaultSlides=[
 ];
 function storefrontSlides(){
  const promos=state.promos.filter(p=>p.active&&p.placement==="home");
- return promos.length?promos.map(p=>({
-  title:p.title,accent:"",subtitle:p.subtitle,image:p.image_url,demo:!!p.is_demo,icon:"shopping-bag",
-  extra:"package",secondary:"tag",route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",
-  cta:"استكشف المزيد"
- })):defaultSlides;
+ if(promos.length)return promos.map(p=>({
+  title:p.title,subtitle:p.subtitle,demo:!!p.is_demo,
+  desktop:p.desktop_image_url||p.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url,
+  route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",cta:"تسوّق الآن"
+ }));
+ const photo=state.products.find(p=>p.active&&p.featured&&safeImg(p.image_url))?.image_url||null;
+ return [{title:"تسوّق بسهولة من BAZOO",subtitle:"كل ما يحتاجه البيت من الإلكترونيات والأجهزة والقرطاسية. اختار اللي يعجبك.",desktop:photo,mobile:photo,demo:!state.products.some(p=>!p.is_demo),route:"categories",cta:"اكتشف المنتجات"}];
 }
 function drawHero(){
- const slides=storefrontSlides();const index=((state.promoIndex%slides.length)+slides.length)%slides.length;const slide=slides[index];
- const button=slide.slug?'<button class="btn accent" data-main-cat="'+esc(slide.slug)+'">'+esc(slide.cta)+' '+icon("arrow-left",17)+'</button>':'<button class="btn accent" data-go="'+esc(slide.route||"categories")+'">'+esc(slide.cta)+' '+icon("arrow-left",17)+'</button>';
- const visual=slide.image&&safeImg(slide.image)?'<img class="merch-photo" src="'+safeImg(slide.image)+'" alt="'+esc(slide.title)+'" loading="eager">':
- '<div class="merch-illustration"><div class="merch-primary-card">'+icon(slide.icon,126)+'</div><div class="merch-floating one">'+icon(slide.extra,42)+'</div><div class="merch-floating two">'+icon(slide.secondary,42)+'</div></div>';
- return '<div class="merch-slider-inner"><div class="merch-content">'+(slide.demo?'<span class="merch-demo-stamp">معاينة توضيحية</span>':'')+'<span class="merch-eyebrow">'+icon("sparkles",17)+' اكتشف عالم BAZOO</span><h1>'+esc(slide.title)+(slide.accent?'<br><b>'+esc(slide.accent)+'</b>':'')+'</h1><p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons">'+button+'<button class="btn ghost" data-go="offers">تصفح العروض</button></div></div><div class="merch-visual"><div class="merch-orbit"></div>'+visual+'</div></div><div class="slider-controls"><button data-slide="-1" aria-label="الشريحة السابقة">'+icon("chevron-right",18)+'</button><div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(index===i?'active':'')+'" aria-label="الشريحة '+(i+1)+'" aria-current="'+(index===i?'true':'false')+'"></button>').join("")+'</div><button data-slide="1" aria-label="الشريحة التالية">'+icon("chevron-left",18)+'</button></div>';
+ const slides=storefrontSlides(),idx=((state.promoIndex%slides.length)+slides.length)%slides.length,slide=slides[idx];
+ const desktop=safeImg(slide.desktop),mobile=safeImg(slide.mobile);
+ const picture=desktop?'<picture class="merch-picture">'+(mobile?'<source media="(max-width: 600px)" srcset="'+mobile+'">':'')+'<img src="'+desktop+'" alt="'+esc(slide.title)+'" loading="eager" decoding="async"></picture>':'';
+ return '<div class="merch-slider-inner '+(picture?'photo-layout':'plain-layout')+'">'
+  +picture+(picture?'<div class="merch-scrim"></div>':'')
+  +'<div class="merch-content">'+(slide.demo?'<span class="merch-demo-stamp">بانر تجريبي</span>':'')
+  +'<span class="merch-eyebrow">'+icon("sparkles",17)+' اختيارات BAZOO</span><h1>'+esc(slide.title)+'</h1>'
+  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" data-go="'+esc(slide.route||"categories")+'">'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
+  +'</div><div class="slider-controls"><button data-slide="-1" aria-label="العرض السابق">'+icon("chevron-right",18)+'</button>'
+  +'<div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(idx===i?'active':'')+'" aria-label="العرض '+(i+1)+'" aria-current="'+(idx===i?'true':'false')+'"></button>').join("")+'</div>'
+  +'<button data-slide="1" aria-label="العرض التالي">'+icon("chevron-left",18)+'</button></div>';
 }
 function categoryCircles(){
  const list=state.categories.length?state.categories.filter(c=>c.active&&c.parent_id).map(c=>({id:c.id,slug:c.slug,name:c.name})):homeCategoryDefaults.map(c=>({...c,id:null}));
