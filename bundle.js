@@ -1,4 +1,4 @@
-/* BAZOO reliable product and discount saves; image errors no longer block prices */
+/* BAZOO owner access diagnostics and bound administrator actions */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -355,6 +355,27 @@ if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" sty
 return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
 function bindAdmin(){
+ // Bind admin actions directly to their visible buttons, rather than relying
+ // solely on the storefront's generic delegated navigation handler.
+ document.querySelectorAll("[data-admin-tab]").forEach(b=>b.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab=b.dataset.adminTab;
+  state.editProduct=null;
+  render();
+ });
+ document.querySelectorAll("[data-edit-product]").forEach(b=>b.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab="products";
+  state.editProduct=b.dataset.editProduct;
+  render();
+ });
+ const addProduct=document.querySelector("#newProduct");
+ if(addProduct)addProduct.onclick=e=>{
+  e?.stopPropagation?.();
+  state.adminTab="products";
+  state.editProduct="new";
+  render();
+ };
 const addMember=document.querySelector("#addStaffMember");if(addMember)addMember.onclick=()=>memberEditor();
 document.querySelectorAll("[data-staff-edit]").forEach(b=>b.onclick=()=>memberEditor(b.dataset.staffEdit));
 document.querySelectorAll("[data-staff-remove]").forEach(b=>b.onclick=()=>revokeMember(b.dataset.staffRemove));
@@ -1052,7 +1073,7 @@ async function render(){
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  document.querySelectorAll("#categoryNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  let content="";
- if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="brands")content=brandsPage();else if(route==="product"){state.galleryIndex=0;content=productDetailsPage(parts[1]||"");}else if(route==="favorites")content=favoritesPage();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice">هذه الصفحة مخصصة لفريق إدارة بازو فقط. <a href="#/account">انتقل للحساب</a></div></div>';else content=home();
+ if(route==="home")content=home();else if(route==="categories")content=categories();else if(route==="offers")content=offers();else if(route==="brands")content=brandsPage();else if(route==="product"){state.galleryIndex=0;content=productDetailsPage(parts[1]||"");}else if(route==="favorites")content=favoritesPage();else if(route==="cart")content=cart();else if(route==="checkout")content=checkout();else if(route==="account")content=await account();else if(route==="market")content=market();else if(route==="admin")content=state.admin?await adminPage():'<div class="page"><div class="notice"><h2>التحقق من حساب المسؤول</h2><p>لم تُحمّل صلاحيات الإدارة لهذه الجلسة. يرجى تسجيل الدخول بحساب المالك أو تحديث الصفحة.</p><button class="btn primary" data-go="account">تسجيل الدخول إلى الحساب</button><button class="btn outline" id="retryAdminAccess">إعادة التحقق من الصلاحيات</button></div></div>';else content=home();
  if(state.route!==route)return;
  if(state.catalogFailure)content='<div class="connection-notice" role="alert">'+icon("circle-alert",20)+' <span>تعذّر الاتصال بقاعدة بيانات بازو. تأكد من الإنترنت ثم أعد المحاولة.</span> <button class="btn outline" id="retryCatalog">'+icon("refresh",16)+' إعادة المحاولة</button></div>'+content;
  $("#app").innerHTML=content;$("#app").querySelectorAll("form").forEach(f=>f.noValidate=true);
@@ -1066,7 +1087,7 @@ document.addEventListener("click",async e=>{
  if(b.tagName==="A"&&b.getAttribute("href")?.startsWith("#/")){e.preventDefault();go(decodeURIComponent(b.getAttribute("href").slice(2)));return}
  if(b.dataset.provinceContext){openProvincePicker(b.dataset.provinceContext);return}
  if(b.dataset.pickProvince){chooseProvince(b.dataset.pickProvince,b.dataset.provinceTarget);return}
- if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();go(b.dataset.go);return}
+ if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();if(b.dataset.go==="admin"){await refreshAuth();if(!state.admin){notify("يرجى تسجيل الدخول بحساب مسؤول المتجر ثم إعادة المحاولة.");go("account");return}}go(b.dataset.go);return}
  if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.category=c?String(c.id):"";state.brand="";state.q="";go("categories","#catalogFilters");return}
  if(b.dataset.brand){state.brand=b.dataset.brand;state.category="";state.q="";go("categories","#catalogFilters");return}
  if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories","#catalogFilters");return}
@@ -1084,6 +1105,7 @@ document.addEventListener("click",async e=>{
  if(b.dataset.passwordToggle){const input=document.querySelector('#authForm input[name="'+b.dataset.passwordToggle+'"]');if(input){const show=input.type==="password";input.type=show?"text":"password";b.innerHTML=icon(show?"eye-off":"eye",19);b.setAttribute("aria-label",show?"إخفاء كلمة المرور":"إظهار كلمة المرور")}return}
  if(b.id==="toCheckout"){if(cartEntries().some(x=>x.p.is_demo)){openModal("طلب تجريبي للمعاينة",'<p class="subtle">تحتوي سلة التسوق على منتجات تجريبية بأسعار توضيحية. يمكنك تصفحها، لكن تأكيد الشراء متاح للمنتجات الفعلية فقط.</p><button class="btn primary" data-go="categories">استعرض المنتجات</button>');return}if(!$("#cartGovernorate").value)return notify("يرجى اختيار المحافظة لحساب رسوم التوصيل.");state.selectedGovernorate=$("#cartGovernorate").value;go("checkout");return}
  if(b.id==="retryCatalog"){await loadCatalog();render();return}
+ if(b.id==="retryAdminAccess"){await refreshAuth();await render();return}
  if(b.id==="resetPassword"){const email=$('#authForm input[name="email"]')?.value.trim();if(!email)return notify("يرجى إدخال البريد الإلكتروني أولاً.");const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#/account"});notify(error?error.message:"إذا كان البريد الإلكتروني مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.");return}
  if(b.id==="signOut"){await sb.auth.signOut();state.user=null;state.admin=false;state.adminRole=null;state.adminPermissions={};renderCategoryNav();notify("تم تسجيل الخروج");go("home");return}
  if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;state.editProduct=null;pendingScroll="#adminTabContent";render();return}
