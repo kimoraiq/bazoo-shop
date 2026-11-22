@@ -159,14 +159,15 @@ async function saveProduct(form){
 function showPromoEditor(id){
  const p=state.promos.find(x=>x.id===id)||{};
  const desk=safeImg(p.desktop_image_url||p.image_url),mobile=safeImg(p.mobile_image_url||p.desktop_image_url||p.image_url);
- const preview=(name,label,dimensions,src)=>'<label class="banner-upload-box '+name+'"><span class="banner-upload-header">'+icon("image",17)+' '+label+' <small>'+dimensions+'</small></span><span class="banner-preview '+name+'-preview" id="preview-'+name+'">'+(src?'<img src="'+src+'" alt="معاينة البنر">':icon("image",32))+'</span><span class="banner-upload-guide">تُقصّ الصورة تلقائياً للمقاس الثابت قبل الرفع.</span><input class="field" type="file" accept="image/png,image/jpeg,image/webp" name="photo_'+name+'"></label>';
+ const preview=(name,label,dimensions,src)=>'<label class="banner-upload-box '+name+'"><span class="banner-upload-header">'+icon("image",17)+' '+label+' <small>'+dimensions+'</small></span><span class="banner-preview '+name+'-preview" id="preview-'+name+'">'+(src?'<img src="'+src+'" alt="معاينة البنر">':icon("image",32))+'</span><span class="banner-upload-guide">تُكيّف الصورة للمقاس الثابت مع الحفاظ على جميع تفاصيل التصميم.</span><input class="field" type="file" accept="image/png,image/jpeg,image/webp" name="photo_'+name+'"></label>';
  openModal(p.id?"تعديل البنر":"إضافة بنر",'<form id="adminPromoForm" class="stack banner-editor" novalidate>'
   +'<input type="hidden" name="id" value="'+esc(p.id||"")+'">'
   +'<label class="formgroup">عنوان البنر *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
   +'<label class="formgroup">النص التوضيحي<input name="subtitle" class="field" maxlength="170" value="'+esc(p.subtitle||"")+'"></label>'
+  +'<label class="formgroup">نمط العرض<select name="artwork_only" class="field"><option value="true" '+(p.artwork_only!==false?"selected":"")+'>تصميم إعلان جاهز (الصورة تحتوي النصوص والمنتجات)</option><option value="false" '+(p.artwork_only===false?"selected":"")+'>صورة مع عنوان وزر من الموقع</option></select></label>'
   +'<label class="formgroup">منتج مرتبط بالبنر (اختياري)<select class="field" name="product_id"><option value="">بنر عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
-  +'<p class="note">ارفع صورة فوتوغرافية مناسبة لكل شاشة. تظهر الصورة داخل مساحة ثابتة، والنظام يقصها تلقائياً عند الحفظ دون تغيير ارتفاع البنر.</p>'
+  +'<p class="note">ارفع البنر المصمّم النهائي من فريق التصميم، بنسختين منفصلتين. يتم الحفاظ على محتوى الصورة بالكامل داخل القياس الثابت، بدون اقتطاع النصوص أو المنتجات.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<div class="formgrid"><label class="formgroup">مكان الظهور<select name="placement" class="field">'+[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.placement||"home")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<label class="formgroup">ترتيب العرض<input type="number" name="sort_order" min="0" max="9999" class="field" value="'+esc(p.sort_order??0)+'"></label>'
@@ -200,8 +201,8 @@ async function cropBanner(file,width,height){
   const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
   const ctx=canvas.getContext("2d");
   if(!ctx)throw Error("المتصفح لا يدعم تجهيز الصور");
-  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,width,height);
-  const scale=Math.max(width/img.naturalWidth,height/img.naturalHeight);
+  ctx.fillStyle="#42168f";ctx.fillRect(0,0,width,height);
+  const scale=Math.min(width/img.naturalWidth,height/img.naturalHeight);
   const drawW=img.naturalWidth*scale,drawH=img.naturalHeight*scale;
   ctx.drawImage(img,(width-drawW)/2,(height-drawH)/2,drawW,drawH);
   return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error("تعذّر حفظ الصورة")),"image/jpeg",.88));
@@ -219,7 +220,7 @@ async function uploadBannerPhoto(file,type){
 async function savePromo(form){
  const f=new FormData(form),id=f.get("id");
  const v={title:String(f.get("title")||"").trim(),subtitle:String(f.get("subtitle")||"").trim(),
-  placement:String(f.get("placement")),link_url:String(f.get("link_url")),product_id:f.get("product_id")?String(f.get("product_id")):null,active:f.get("active")==="true",
+  placement:String(f.get("placement")),link_url:String(f.get("link_url")),product_id:f.get("product_id")?String(f.get("product_id")):null,artwork_only:f.get("artwork_only")==="true",active:f.get("active")==="true",
   is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
  if(!v.title){notify("اكتب عنوان البنر");return}
  const button=form.querySelector('button[type="submit"]');button.disabled=true;
