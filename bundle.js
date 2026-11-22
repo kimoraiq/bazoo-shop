@@ -1,4 +1,4 @@
-/* BAZOO responsive retail website — local first-party bundle */
+/* BAZOO first-party bundled store app */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -182,6 +182,7 @@ function showPromoEditor(id){
   +'<input type="hidden" name="id" value="'+esc(p.id||"")+'">'
   +'<label class="formgroup">عنوان البنر *<input name="title" class="field" required maxlength="90" value="'+esc(p.title||"")+'"></label>'
   +'<label class="formgroup">النص التوضيحي<input name="subtitle" class="field" maxlength="170" value="'+esc(p.subtitle||"")+'"></label>'
+  +'<label class="formgroup">منتج مرتبط بالبنر (اختياري)<select class="field" name="product_id"><option value="">بنر عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
   +'<p class="note">ارفع صورة فوتوغرافية مناسبة لكل شاشة. تظهر الصورة داخل مساحة ثابتة، والنظام يقصها تلقائياً عند الحفظ دون تغيير ارتفاع البنر.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
@@ -236,7 +237,7 @@ async function uploadBannerPhoto(file,type){
 async function savePromo(form){
  const f=new FormData(form),id=f.get("id");
  const v={title:String(f.get("title")||"").trim(),subtitle:String(f.get("subtitle")||"").trim(),
-  placement:String(f.get("placement")),link_url:String(f.get("link_url")),active:f.get("active")==="true",
+  placement:String(f.get("placement")),link_url:String(f.get("link_url")),product_id:f.get("product_id")?String(f.get("product_id")):null,active:f.get("active")==="true",
   is_demo:f.get("is_demo")==="true",sort_order:Number(f.get("sort_order")||0)};
  if(!v.title){notify("اكتب عنوان البنر");return}
  const button=form.querySelector('button[type="submit"]');button.disabled=true;
@@ -248,7 +249,7 @@ async function savePromo(form){
   v.desktop_image_url=desktop||previous?.desktop_image_url||previous?.image_url||null;
   v.mobile_image_url=mobile||previous?.mobile_image_url||previous?.desktop_image_url||previous?.image_url||null;
   v.image_url=v.desktop_image_url;
-  if(v.placement==="home"&&!v.desktop_image_url){notify("ارفع صورة اللابتوب على الأقل حتى يظهر البنر بصورة حقيقية");return}
+  if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة اللابتوب أو اربط البنر بمنتج له صورة");return}
   const result=id?await sb.from("promotions").update(v).eq("id",id):await sb.from("promotions").insert(v);
   if(result.error)throw Error(result.error.message);
   closeModal();await loadCatalog();notify("تم حفظ البنر للموبايل واللابتوب");render();
@@ -387,11 +388,14 @@ const defaultSlides=[
 ];
 function storefrontSlides(){
  const promos=state.promos.filter(p=>p.active&&p.placement==="home");
- if(promos.length)return promos.map(p=>({
-  title:p.title,subtitle:p.subtitle,demo:!!p.is_demo,
-  desktop:p.desktop_image_url||p.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url,
-  route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",cta:"تسوّق الآن"
- }));
+ if(promos.length)return promos.map(p=>{
+  const linked=state.products.find(x=>x.id===p.product_id&&x.active);
+  return {title:p.title,subtitle:p.subtitle,demo:!!p.is_demo||!!linked?.is_demo,
+   desktop:p.desktop_image_url||p.image_url||linked?.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url||linked?.image_url,
+   productId:linked?.id||null,
+   route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",
+   cta:linked?"اكتشف المنتج":"تسوّق الآن"};
+ });
  const photo=state.products.find(p=>p.active&&p.featured&&safeImg(p.image_url))?.image_url||null;
  return [{title:"تسوّق بسهولة من BAZOO",subtitle:"كل ما يحتاجه البيت من الإلكترونيات والأجهزة والقرطاسية. اختار اللي يعجبك.",desktop:photo,mobile:photo,demo:!state.products.some(p=>!p.is_demo),route:"categories",cta:"اكتشف المنتجات"}];
 }
@@ -403,7 +407,7 @@ function drawHero(){
   +picture+(picture?'<div class="merch-scrim"></div>':'')
   +'<div class="merch-content">'+(slide.demo?'<span class="merch-demo-stamp">بانر تجريبي</span>':'')
   +'<span class="merch-eyebrow">'+icon("sparkles",17)+' اختيارات BAZOO</span><h1>'+esc(slide.title)+'</h1>'
-  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" data-go="'+esc(slide.route||"categories")+'">'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
+  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" '+(slide.productId?'data-detail="'+esc(slide.productId)+'"':'data-go="'+esc(slide.route||"categories")+'"')+'>'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
   +'</div><div class="slider-controls"><button data-slide="-1" aria-label="العرض السابق">'+icon("chevron-right",18)+'</button>'
   +'<div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(idx===i?'active':'')+'" aria-label="العرض '+(i+1)+'" aria-current="'+(idx===i?'true':'false')+'"></button>').join("")+'</div>'
   +'<button data-slide="1" aria-label="العرض التالي">'+icon("chevron-left",18)+'</button></div>';
