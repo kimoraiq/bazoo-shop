@@ -52,7 +52,7 @@ const sb={
 let reloads=0,rendered=0;
 const api=createAdmin({
  sb,state,esc:x=>String(x??""),money:x=>String(x),safeImg:x=>x,
- loadCatalog:async()=>{reloads++},notify:x=>messages.push(String(x)),
+ loadCatalog:async()=>{reloads++;return true},notify:x=>messages.push(String(x)),
  render:async()=>{rendered++},openModal:()=>{},closeModal:()=>{},go:()=>{},
  icon:(name)=>'<svg data-icon="'+name+'"></svg>',confirmAction:()=>{}
 });
@@ -105,7 +105,7 @@ function form(data,files=[]){
  const badPhoto=form({id:"p-1",name:"منتج تجريبي",category_id:"4",stock:"10",original_price_iqd:"100000",discount_percent:"15",active:"true"},[{type:"image/gif",size:100000}]);
  await api.saveProduct(badPhoto);
  assert.equal(state.products.find(p=>p.id==="p-1").price_iqd,85000,"Image failure must not roll back discount edit");
- assert.match(badPhoto.alert.textContent,/حُفظ المنتج والسعر والخصم/);
+ assert.match(badPhoto.alert.textContent,/وصل ردّ حفظ المنتج/);
  assert.equal(badPhoto.button.disabled,false,"Save button must be re-enabled after failure");
  // An invalid standalone percent must not write.
  const n=writes.length;
