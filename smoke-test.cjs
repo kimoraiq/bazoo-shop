@@ -11,11 +11,15 @@ assert.match(css,/\.header \.brand img\{[\s\S]*?object-fit:contain!important/,"h
 assert.match(css,/\.header \.search\{[\s\S]*?background:#f8f5fc!important/,"search must harmonize with the new header");
 assert.match(css,/@media\(max-width:600px\)\{[\s\S]*?\.header \.brand\{[\s\S]*?order:1/,"mobile brand should be in the first row");
 assert.doesNotMatch(css,/BAZOO identity ribbon/,"detached ribbon styling must be removed");
-assert.match(css,/BAZOO MOBILE HEADER v16/,"mobile-first header layout missing");
-assert.match(css,/grid-template-areas:"brand delivery actions" "search search search"/,"mobile header grid is missing");
-assert.match(css,/\.header \.brand\{[\s\S]*?width:118px!important/,"phone BAZOO logo must be smaller than old 142px");
-assert.match(css,/\.header #cartBtn\{[\s\S]*?background:#5b21b6!important/,"cart requires branded purple emphasis");
-assert.match(css,/\.header \.search button\{[\s\S]*?background:#5822af!important/,"phone search action should use brand purple");
+assert.match(css,/BAZOO MOBILE HEADER v17/,"balanced phone header style missing");
+assert.match(css,/grid-template-columns:112px minmax\(0,1fr\) 112px!important/,"balanced three-zone phone header must have matching side widths");
+assert.match(css,/grid-template-areas:"brand delivery actions" "search search search"/,"mobile header should place search on its own row");
+assert.match(css,/\.header \.brand\{[\s\S]*?width:112px!important/,"mobile logo should fit the phone header");
+assert.match(css,/\.header #cartBtn\{[\s\S]*?background:#5822af!important/,"cart should use BAZOO purple");
+assert.match(css,/\.header \.search button\{[\s\S]*?background:#5822af!important/,"mobile search button should use BAZOO purple");
+assert.match(css,/BAZOO mobile bottom dock/,"branded bottom navigation is missing");
+assert.match(css,/\.bottomnav\{[\s\S]*?background:linear-gradient\(115deg,#51209e/,"bottom dock should be purple");
+assert.match(css,/\.bottomnav button.active::before\{[\s\S]*?background:#ff9b53/,"active page should have orange indicator");
 assert.match(html,/class="delivery-mobile">لكل العراق/,"mobile delivery copy missing");
 assert.match(css,/BAZOO purple category navigation/,"purple nav styling missing");
 assert.match(css,/\.category-topbar\{\s*background:#5822af!important/,"category nav should use BAZOO purple");
@@ -68,7 +72,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/mobileheader16/,"asset cache bust missing");
+ assert.match(html,/mobileheader17/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
