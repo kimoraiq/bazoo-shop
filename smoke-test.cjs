@@ -50,9 +50,17 @@ const context={
  assert.match(source,/photo_desktop/,"desktop admin file input missing");
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
- assert.match(source,/category-thumb/,"real photo category thumbnails missing");
- assert.match(html,/bazoo8/,"asset cache bust missing");
+ assert.match(source,/compact-categories/,"compact SVG categories missing");
+ assert.match(html,/bazoo9/,"asset cache bust missing");
 
+ assert.match(source,/function productDetailsPage\(/,"product details page missing");
+ assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
+ assert.match(source,/function imagesForProduct\(/,"product photos are not linked");
+ assert.match(source,/product_images/,"Supabase product image table not queried");
+ assert.match(source,/function openProvincePicker\(/,"branded province picker missing");
+ assert.match(source,/artworkOnly/,"finished banner artwork display missing");
+ assert.match(source,/function cropBanner\(/,"admin image preparation missing");
+ assert.match(source,/name="photos"/,"multiple admin photos upload missing");
  assert.match(source,/function confirmAction\(/,"branded confirmation dialog missing");
  assert.match(source,/function removeRecord\(/,"admin product and promo deletion missing");
  assert.match(source,/demo-price-note/,"demo price labels missing");
