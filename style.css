@@ -1190,3 +1190,56 @@ body{background:#fbfafc;color:var(--ink)}
  .header .delivery-note .delivery-desktop{display:none!important}
  .header .delivery-note .delivery-mobile{display:block!important}
 }
+
+
+/* BAZOO staff control center — owner, full-access and scoped team roles */
+.admin-role-caption{font-size:12px;color:#8056b1;font-weight:900;margin:3px 0 0}
+.adminnav{padding-bottom:5px;scrollbar-width:none}
+.adminnav::-webkit-scrollbar{display:none}
+.adminnav button{white-space:nowrap}
+.staff-panel{padding-top:6px}
+.staff-panel-head{display:flex;justify-content:space-between;align-items:center;gap:20px;background:linear-gradient(115deg,#f8f2ff,#fff);border:1px solid #ece2f8;border-radius:18px;padding:23px;margin:0 0 18px}
+.staff-panel-head h2{font-size:23px;margin:0 0 9px;color:#34204f}
+.staff-panel-head p{font-size:13px;color:#7a698d;line-height:1.8;margin:0;max-width:620px}
+.staff-panel-head .btn{white-space:nowrap}
+.staff-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.staff-card{border:1px solid #e9e0f3;border-radius:17px;background:#fff;padding:21px;display:flex;flex-direction:column;gap:13px;box-shadow:0 3px 13px #2e14500a;min-width:0}
+.staff-card-main{display:flex;align-items:center;gap:13px;min-width:0}
+.staff-avatar{display:grid;place-items:center;width:50px;height:50px;flex-shrink:0;background:#f1e7ff;border-radius:15px;color:#5b21b6}
+.staff-avatar .svg-icon{width:23px;height:23px}
+.staff-info{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
+.staff-info strong{font-size:14px;overflow-wrap:anywhere;color:#362548}
+.staff-role{display:inline-flex;align-items:center;border-radius:9px;background:#f2eafa;color:#6835a8;font-size:11px;padding:6px 10px;font-weight:900}
+.staff-role.owner-role{background:#ffecdb;color:#a64c17}
+.staff-grants{display:flex;flex-wrap:wrap;gap:7px;margin:0;font-size:12px;color:#82738f;line-height:1.6;min-height:26px}
+.staff-grants>span{border:1px solid #eae1f3;background:#faf7fd;padding:5px 9px;border-radius:99px;color:#61458a;font-size:11px;font-weight:800}
+.staff-actions{display:flex;gap:9px;flex-wrap:wrap;border-top:1px solid #f1eaf5;padding-top:14px;margin-top:auto}
+.staff-actions .btn{min-height:38px;padding:8px 11px;font-size:11px}
+.staff-actions .btn .svg-icon{width:16px;height:16px}
+.staff-owner-note{display:flex;align-items:center;gap:7px;color:#987da8;border-top:1px solid #f1eaf5;padding-top:14px;margin-top:auto;font-size:11px;font-weight:800}
+.staff-owner-note .svg-icon{width:16px;height:16px}
+.staff-editor-form{display:grid;gap:15px;padding-top:13px}
+.staff-note{font-size:12px;line-height:1.8;border-radius:11px;background:#f8f4fc;color:#765e89;padding:11px 14px;margin:0}
+.staff-scopes-title{font-weight:900;font-size:13px;margin:3px 0 10px;color:#342149}
+.staff-scopes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.staff-scope{position:relative;display:grid;grid-template-columns:21px 1fr;align-items:start;gap:6px 10px;padding:13px 11px;background:#fff;border:1px solid #e9e2f2;border-radius:13px;cursor:pointer}
+.staff-scope:has(input:checked){border-color:#8551c8;background:#f8f2ff}
+.staff-scope input{grid-row:1 / span 2;accent-color:#5822af;width:18px;height:18px;margin:1px 0 0}
+.staff-scope-title{display:flex;align-items:center;gap:6px;color:#342147;font-size:12px;font-weight:900}
+.staff-scope-title .svg-icon{color:#7955b0;width:16px;height:16px}
+.staff-scope small{color:#8b7c96;font-size:10px;line-height:1.5}
+.staff-save{width:100%;min-height:46px}
+#staffScopeFields[hidden]{display:none!important}
+@media(max-width:850px){
+ .staff-cards{grid-template-columns:1fr}
+ .staff-panel-head{padding:16px;align-items:flex-start;flex-direction:column}
+}
+@media(max-width:600px){
+ .adminnav{flex-wrap:nowrap;overflow-x:auto;padding:3px 0 10px;gap:7px}
+ .adminnav button{font-size:11px;flex:0 0 auto;padding:9px 11px}
+ .staff-card{padding:15px;border-radius:14px}
+ .staff-panel-head h2{font-size:20px}
+ .staff-panel-head p{font-size:12px}
+ .staff-scope{grid-template-columns:20px 1fr}
+ .staff-scopes{grid-template-columns:1fr}
+}
