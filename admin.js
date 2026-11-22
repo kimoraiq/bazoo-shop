@@ -11,14 +11,15 @@ function calculateDiscount(original,percent){
 
 /* Every newly uploaded BAZOO photo must be <= 15 KiB (15360 bytes). */
 const MAX_IMAGE_BYTES=15*1024;
+const MAX_BANNER_BYTES=1024*1024; // One mebibyte per desktop/mobile banner
 const MAX_ORIGINAL_BYTES=25*1024*1024;
 const optimizedImages=new WeakMap();
 function humanKb(bytes){return (bytes/1024).toFixed(1)+" كيلوبايت"}
-async function compressSiteImage(file,maxWidth=1400,maxHeight=1400){
+async function compressSiteImage(file,maxWidth=1400,maxHeight=1400,maxBytes=MAX_IMAGE_BYTES){
  if(!file||!file.size)throw Error("الصورة فارغة أو غير صالحة");
  if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("الصورة لازم تكون JPG أو PNG أو WEBP");
  if(file.size>MAX_ORIGINAL_BYTES)throw Error("حجم الصورة الأصلية أكبر من 25 ميگابايت");
- if(file.size<=MAX_IMAGE_BYTES)return file;
+ if(file.size<=maxBytes)return file;
  const originalURL=URL.createObjectURL(file);
  try{
   const source=await new Promise((resolve,reject)=>{
@@ -54,9 +55,9 @@ async function compressSiteImage(file,maxWidth=1400,maxHeight=1400){
     draft=await encode(.35,type);
    }
    let lowQuality=.35,highQuality=.88;
-   if(draft.size>MAX_IMAGE_BYTES){
+   if(draft.size>maxBytes){
     draft=await encode(.12,type);
-    if(draft.size>MAX_IMAGE_BYTES)continue;
+    if(draft.size>maxBytes)continue;
     lowQuality=.12;
     highQuality=.35;
    }
@@ -64,13 +65,13 @@ async function compressSiteImage(file,maxWidth=1400,maxHeight=1400){
    for(let k=0;k<5;k++){
     const quality=(lowQuality+highQuality)/2;
     const candidate=await encode(quality,type);
-    if(candidate.size<=MAX_IMAGE_BYTES){
+    if(candidate.size<=maxBytes){
      best=candidate;lowQuality=quality;
     }else highQuality=quality;
    }
-   if(best.size<=MAX_IMAGE_BYTES)return best;
+   if(best.size<=maxBytes)return best;
   }
-  throw Error("ما گدرنا نضغط الصورة إلى 15 كيلوبايت. جرّب صورة أبسط أو بدقة أقل.");
+  throw Error("ما گدرنا نضغط الصورة للحجم المحدد. جرّب صورة أبسط أو بدقة أقل.");
  }finally{URL.revokeObjectURL(originalURL)}
 }
 function optimizedImage(file,maxWidth=1400,maxHeight=1400){
@@ -377,7 +378,7 @@ function showPromoEditor(id){
   +'<label class="formgroup">نمط العرض<select name="artwork_only" class="field"><option value="true" '+(p.artwork_only!==false?"selected":"")+'>تصميم إعلان جاهز (الصورة تحتوي النصوص والمنتجات)</option><option value="false" '+(p.artwork_only===false?"selected":"")+'>صورة مع عنوان وزر من الموقع</option></select></label>'
   +'<label class="formgroup">منتج مرتبط بالبنر (اختياري)<select class="field" name="product_id"><option value="">بنر عام بدون منتج</option>'+state.products.filter(x=>x.active).map(x=>'<option value="'+x.id+'" '+(p.product_id===x.id?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'
   +'<div class="banner-upload-grid">'+preview("desktop","صورة اللابتوب","1440 × 480",desk)+preview("mobile","صورة الموبايل","720 × 900",mobile)+'</div>'
-  +'<p class="note">ارفع البنر المصمّم النهائي من فريق التصميم، بنسختين منفصلتين. تنضغط كل صورة بنر إلى 15 كيلوبايت كحد أقصى؛ قد تتأثر دقة النصوص والتفاصيل بسبب هذا الحد الصارم.</p>'
+  +'<p class="note">ارفع البنر المصمّم النهائي من فريق التصميم، بنسختين منفصلتين. تنضغط كل صورة بنر تلقائياً إلى 1 ميگابايت كحد أقصى مع الحفاظ على جودة التصميم قدر الإمكان. صور المنتجات تبقى 15 كيلوبايت.</p>'
   +'<label class="formgroup">رابط داخل المتجر<select name="link_url" class="field">'+[["#/categories","كل المنتجات"],["#/offers","العروض"],["#/home","الرئيسية"],["#/cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.link_url||"#/categories")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<div class="formgrid"><label class="formgroup">مكان الظهور<select name="placement" class="field">'+[["home","الرئيسية"],["categories","الفئات"],["cart","العربة"]].map(([v,l])=>'<option value="'+v+'" '+((p.placement||"home")===v?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'
   +'<label class="formgroup">ترتيب العرض<input type="number" name="sort_order" min="0" max="9999" class="field" value="'+esc(p.sort_order??0)+'"></label>'
@@ -433,7 +434,7 @@ function prepareBannerPhoto(file,type){
   const dims=type==="desktop"?[1440,480]:[720,900];
   preparedBanners.set(file,(async()=>{
    const composited=await cropBanner(file,...dims);
-   return await compressSiteImage(composited,dims[0],dims[1]);
+   return await compressSiteImage(composited,dims[0],dims[1],MAX_BANNER_BYTES);
   })());
  }
  return preparedBanners.get(file);
@@ -441,11 +442,11 @@ function prepareBannerPhoto(file,type){
 async function uploadBannerPhoto(file,type){
  if(!file?.size)return null;
  const blob=await prepareBannerPhoto(file,type);
- if(blob.size>MAX_IMAGE_BYTES)throw Error("حجم البنر تجاوز 15 كيلوبايت بعد الضغط");
+ if(blob.size>MAX_BANNER_BYTES)throw Error("حجم البنر تجاوز 1 ميگابايت بعد الضغط");
  const name="promotions/"+type+"/"+crypto.randomUUID()+"."+imageExtension(blob);
- const {error}=await sb.storage.from("product-images").upload(name,blob,{contentType:blob.type,cacheControl:"31536000"});
+ const {error}=await sb.storage.from("promo-images").upload(name,blob,{contentType:blob.type,cacheControl:"31536000"});
  if(error)throw Error(error.message);
- return sb.storage.from("product-images").getPublicUrl(name).data.publicUrl;
+ return sb.storage.from("promo-images").getPublicUrl(name).data.publicUrl;
 }
 async function savePromo(form){
  const f=new FormData(form),id=f.get("id");
