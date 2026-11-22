@@ -107,7 +107,7 @@ function storefrontSlides(){
  const promos=state.promos.filter(p=>p.active&&p.placement==="home");
  if(promos.length)return promos.map(p=>{
   const linked=state.products.find(x=>x.id===p.product_id&&x.active);
-  return {title:p.title,subtitle:p.subtitle,demo:!!p.is_demo||!!linked?.is_demo,
+  return {title:p.title,subtitle:p.subtitle,demo:!!p.is_demo||!!linked?.is_demo,artworkOnly:!!p.artwork_only,
    desktop:p.desktop_image_url||p.image_url||linked?.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url||linked?.image_url,
    productId:linked?.id||null,
    route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",
@@ -120,12 +120,15 @@ function drawHero(){
  const slides=storefrontSlides(),idx=((state.promoIndex%slides.length)+slides.length)%slides.length,slide=slides[idx];
  const desktop=safeImg(slide.desktop),mobile=safeImg(slide.mobile);
  const picture=desktop?'<picture class="merch-picture">'+(mobile?'<source media="(max-width: 600px)" srcset="'+mobile+'">':'')+'<img src="'+desktop+'" alt="'+esc(slide.title)+'" loading="eager" decoding="async"></picture>':'';
- return '<div class="merch-slider-inner '+(picture?'photo-layout':'plain-layout')+'">'
-  +picture+(picture?'<div class="merch-scrim"></div>':'')
+ const action=slide.productId?'data-detail="'+esc(slide.productId)+'"':'data-go="'+esc(slide.route||"categories")+'"';
+ const galleryArtwork=picture&&slide.artworkOnly;
+ const inner=galleryArtwork?
+  '<div class="merch-slider-inner photo-layout final-banner">'+picture+'<button type="button" class="banner-artwork-link" '+action+' aria-label="'+esc(slide.title)+'"></button></div>':
+  '<div class="merch-slider-inner '+(picture?'photo-layout':'plain-layout')+'">'+picture+(picture?'<div class="merch-scrim"></div>':'')
   +'<div class="merch-content">'+(slide.demo?'<span class="merch-demo-stamp">بانر تجريبي</span>':'')
   +'<span class="merch-eyebrow">'+icon("sparkles",17)+' اختيارات BAZOO</span><h1>'+esc(slide.title)+'</h1>'
-  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" '+(slide.productId?'data-detail="'+esc(slide.productId)+'"':'data-go="'+esc(slide.route||"categories")+'"')+'>'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
-  +'</div><div class="slider-controls"><button data-slide="-1" aria-label="العرض السابق">'+icon("chevron-right",18)+'</button>'
+  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" '+action+'>'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div></div>';
+ return inner+'<div class="slider-controls"><button data-slide="-1" aria-label="العرض السابق">'+icon("chevron-right",18)+'</button>'
   +'<div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(idx===i?'active':'')+'" aria-label="العرض '+(i+1)+'" aria-current="'+(idx===i?'true':'false')+'"></button>').join("")+'</div>'
   +'<button data-slide="1" aria-label="العرض التالي">'+icon("chevron-left",18)+'</button></div>';
 }
