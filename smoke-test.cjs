@@ -21,7 +21,7 @@ assert.match(css,/BAZOO mobile bottom dock/,"branded bottom navigation is missin
 assert.match(css,/\.bottomnav\{[\s\S]*?background:linear-gradient\(115deg,#51209e/,"bottom dock should be purple");
 assert.match(css,/\.bottomnav button.active::before\{[\s\S]*?background:#ff9b53/,"active page should have orange indicator");
 assert.match(html,/class="delivery-desktop">إلى جميع أنحاء العراق/,"desktop delivery caption must read naturally");
-assert.match(html,/class="delivery-mobile">لكل العراق/,"mobile delivery copy missing");
+assert.match(html,/class="delivery-mobile">داخل العراق/,"mobile delivery copy missing");
 assert.match(css,/Explicit delivery visibility across breakpoints/,"delivery responsive caption guard missing");
 assert.match(css,/\.header \.delivery-note \.delivery-desktop\{display:block!important\}/,"desktop delivery visible");
 assert.match(css,/\.header \.delivery-note \.delivery-mobile\{display:none!important\}/,"mobile delivery hidden on desktop");
