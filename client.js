@@ -30,7 +30,7 @@ export function createClient(baseUrl, publishableKey) {
   const rawFetch=async(path,options={},authorize=true)=>{
     const headers=new Headers(options.headers||{});
     headers.set("apikey",publishableKey);
-    if(!headers.has("Content-Type") && !(options.body instanceof Blob) && !(options.body instanceof FormData))headers.set("Content-Type","application/json");
+    if(!headers.has("Content-Type") && !(typeof Blob!=="undefined" && options.body instanceof Blob) && !(typeof FormData!=="undefined" && options.body instanceof FormData))headers.set("Content-Type","application/json");
     if(authorize){const token=await getToken();if(token)headers.set("Authorization","Bearer "+token)}
     const ctrl=new AbortController();
     const timeout=setTimeout(()=>ctrl.abort(),10000);
