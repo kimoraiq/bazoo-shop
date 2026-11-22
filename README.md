@@ -1,29 +1,58 @@
-# BAZOO — بازو 🛍️
+# BAZOO | بازو 🛍️
 
-Arabic RTL responsive e-commerce storefront prototype.
+**متجر إلكتروني عراقي متجاوب ومربوط فعلياً بـ Supabase.**
 
-## Features
-- Responsive design for mobile, tablet and desktop
-- BAZOO purple (#5B21B6) and orange (#F97316) identity
-- Search and category browsing
-- Product details, favorites, cart with quantity controls
-- Cart and favorites persisted in the browser via localStorage
-- Checkout **draft** that can be copied (no actual submission)
-- Sample products, sample prices, external demo images
+## الحالة
+- ✅ GitHub Pages + workflow لنشر كل تحديث
+- ✅ منتجات وفئات وعلامات وأسعار ومخزون من قاعدة بيانات حقيقية
+- ✅ تسجيل دخول وإنشاء حساب وتأكيد البريد عبر Supabase Auth
+- ✅ تصفح عام بدون حساب، والدخول مطلوب فقط لإكمال الطلب
+- ✅ عربة ومفضلة محفوظتان محلياً على الجهاز
+- ✅ تأكيد الطلبات داخل Postgres عبر RPC تتحقق من الأسعار والمخزون والشحن وتخصم الكميات بشكل ذري
+- ✅ صفحة طلبات الزبون وحالاتها
+- ✅ إدارة المنتجات: رفع صورة على Supabase Storage، وإضافة/تعديل المنتج والسعر والكمية والتصنيف والماركة
+- ✅ إدارة الطلبات وحالاتها، وأجور التوصيل حسب المحافظة، والإعلانات الترويجية
+- ✅ دعم الهاتف والتابلت والكمبيوتر والعربية RTL
 
-## Launch
-Open `index.html` in your browser. No build step or dependencies needed. Or host it on GitHub Pages.
+## موقع المتجر
+https://kimoraiq.github.io/bazoo-shop/
 
-## Publish with GitHub Pages
-1. Open **Settings → Pages** in this repository.
-2. Under **Build and deployment**, choose **GitHub Actions**.
-3. Open **Actions → Deploy BAZOO to GitHub Pages → Run workflow** if no run starts automatically.
-4. Once deployment succeeds, the expected URL is `https://kimoraiq.github.io/bazoo-shop/`.
+## قاعدة البيانات
+Project: \`bazoo\`، Project ref: \`kgghxcxaqmuypcdwubhr\`.
 
-The live URL is only available after GitHub Pages is enabled and the deployment succeeds.
+جداول: \`categories\`, \`brands\`, \`products\`, \`admin_members\`, \`shipping_rates\`, \`promotions\`, \`orders\`, \`order_items\`.
 
-## Important limitations
-This is an MVP demo, **not a live commercial shop**. Product names, images and prices are placeholders; checkout does not send orders or charge money. Before real sales, add verified inventory and prices, delivery rates, order storage/backend, business contact information, privacy/returns terms, and a real payment/order workflow. The logo in the demo is a CSS interpretation and should be replaced with the original supplied brand logo asset when available.
+كل الجداول تستخدم RLS. إنشاء الطلب عبر \`public.place_order\` المخصص للمستخدم الموثّق فقط. الأسعار تُقرأ من قاعدة البيانات لا من المتصفح. تعاد كمية المنتج إلى المخزون عند إلغاء الطلب.
 
-## Tech
-Vanilla HTML/CSS/JavaScript, Tajawal and Poppins fonts. No framework required for this first iteration.
+## قبل استقبال الطلبات الحقيقية (مهم جداً)
+1. **إنشاء حساب الإدارة:** أنشئ حساباً في الموقع وأكّد البريد الإلكتروني، ثم أدخله إلى \`admin_members\` من SQL Editor بصلاحية مالك المشروع:
+   \`\`\`sql
+   insert into public.admin_members (user_id)
+   select id from auth.users where email = 'ADMIN_EMAIL_HERE'
+   on conflict (user_id) do nothing;
+   \`\`\`
+   استبدل \`ADMIN_EMAIL_HERE\` بإيميل المدير الحقيقي. لا تضع هذا الاستعلام في المتصفح أو ملف عام.
+2. **إعداد روابط المصادقة:** Supabase Dashboard → Authentication → URL Configuration:
+   - Site URL: \`https://kimoraiq.github.io/bazoo-shop/\`
+   - Redirect URL allow list: \`https://kimoraiq.github.io/bazoo-shop/**\`
+   - إيميلات التسجيل والتأكيد قد تتطلب إعداد SMTP مخصص عند زيادة الاستخدام.
+3. **إعداد أجور التوصيل:** لوحة الإدارة → التوصيل → حدّد الأسعار وفعّل المحافظات التي تخدمونها. جميع المحافظات معطلة ابتداءً، حتى لا تُؤخذ طلبات برسوم غير صحيحة.
+4. **رفع المنتجات الحقيقية:** لوحة الإدارة → المنتجات → إضافة منتج. لا توجد منتجات أو أسعار وهمية في قاعدة البيانات.
+5. **الواتساب:** خيار "التنسيق عبر واتساب" يسجل وسيلة الدفع المطلوبة في الطلب فقط؛ لم نربط رقماً رسمياً بعد.
+6. **الدفع الإلكتروني المباشر:** غير مفعل؛ يحتاج عقداً أو تكاملاً حقيقياً مع بوابة دفع مرخّصة وتأكيداً من السيرفر قبل اعتماد الطلب مدفوعاً.
+7. **سياسات البيع:** أضف رقم اتصال رسمي، سياسة إرجاع، شروط البيع، سياسة خصوصية، ورسائل إتمام الطلب قبل الإعلان عن الافتتاح.
+
+## الصلاحيات
+- الزائر: تصفح المنتجات المنشورة والعروض ومعلومات التوصيل.
+- الزبون المسجل: إنشاء الطلبات، وعرض طلباته فقط.
+- عضو الإدارة المحدد في \`admin_members\`: إدارة المنتجات والعروض والتوصيل وحالات الطلبات.
+- لا يمكن للمستخدم جعل نفسه مديراً من الواجهة، ولا تُخزّن مفاتيح \`service_role\` داخل المستودع.
+
+## التقنية
+HTML5 / CSS3 / JavaScript modules + Supabase JS v2.57.0 + Supabase PostgreSQL, Auth, Storage + GitHub Pages.
+
+## فحص النشر
+الـ workflow يشغّل \`node --check app.js\` و\`node --check admin.js\` ثم ينشر إلى GitHub Pages.
+
+## ملاحظة
+لا توجد منتجات أو رسوم توصيل حقيقية حتى يدخلها فريق بازو. المشروع يعمل تقنياً لكنه ليس جاهزاً للبيع قبل إكمال عناصر التشغيل أعلاه.
