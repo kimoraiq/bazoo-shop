@@ -45,7 +45,20 @@ function validateSiteForm(form){
  }
  return true;
 }
-function go(route){location.hash="#/"+route;if(location.hash==="#/"+route)render();if(route.startsWith("product/"))window.scrollTo?.({top:0,behavior:"instant"})}
+let pendingScroll=null;
+function scrollToContent(selector="#app"){
+ const target=document.querySelector(selector)||document.querySelector("#app");
+ if(!target)return;
+ const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+ if(target.scrollIntoView)target.scrollIntoView({behavior:reduced?"auto":"smooth",block:"start"});
+ else window.scrollTo?.({top:0,behavior:reduced?"auto":"smooth"});
+}
+function go(route,target="#app"){
+ pendingScroll=target;
+ const next="#/"+route;
+ if(location.hash!==next)location.hash=next;
+ else render();
+}
 function catName(id){return state.categories.find(x=>x.id===id)?.name||"منتج"}
 function brandName(id){return state.brands.find(x=>x.id===id)?.name||""}
 const activeProducts=()=>state.products.filter(p=>{
@@ -167,7 +180,7 @@ function favoritesPage(){
  return '<div class="page"><h1>المفضلة</h1><p class="subtle">منتجاتك المحفوظة على هذا الجهاز</p>'+productGrid(products)+'</div>';
 }
 function filters(){return '<div class="filter-panel"><label>القسم<select id="categoryFilter"><option value="">كل الأقسام</option>'+state.categories.filter(c=>c.active).map(c=>'<option value="'+c.id+'" '+(String(c.id)===String(state.category)?"selected":"")+'>'+(c.parent_id?"— ":"")+esc(c.name)+'</option>').join("")+'</select></label><label>العلامة التجارية<select id="brandFilter"><option value="">كل العلامات</option>'+state.brands.filter(b=>b.active).map(b=>'<option value="'+b.id+'" '+(String(b.id)===String(state.brand)?"selected":"")+'>'+esc(b.name)+'</option>').join("")+'</select></label><label>بحث عن منتج<input class="field" id="filterSearch" value="'+esc(state.q)+'" placeholder="اسم المنتج أو الماركة..."></label></div>'}
-function categories(){return '<div class="page"><h1>الفئات والعلامات التجارية</h1><p class="subtle">حدد القسم أو العلامة التجارية حتى تطلعلك المنتجات المناسبة</p>'+promoFrame("categories")+filters()+'<div class="section">'+sectionHead("المنتجات","اكتشف المنتجات")+productGrid(filterProducts())+'</div></div>'}
+function categories(){return '<div class="page"><h1>الفئات والعلامات التجارية</h1><p class="subtle">حدد القسم أو العلامة التجارية لعرض المنتجات المناسبة.</p>'+promoFrame("categories")+'<div id="catalogFilters">'+filters()+'</div><div class="section" id="categoryResults">'+sectionHead("المنتجات","اكتشف المنتجات")+productGrid(filterProducts())+'</div></div>'}
 function offers(){return '<div class="page"><h1>عروض بازو <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#percent"></use></svg></h1><p class="subtle">المنتجات المختارة للتخفيضات والعروض من قبل الفريق</p>'+productGrid(filterProducts({category:"",brand:"",q:"",onSale:true}))+'</div>'}
 function market(){return '<div class="page"><div class="notice" style="margin:45px auto;max-width:600px"><div class="empty-illustration"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#store"></use></svg></div><h1>أضف متجرك</h1><p>قريباً سيتاح هذا القسم. نشتغل على تجربة مميزة لأصحاب المتاجر.</p><button class="btn primary" data-go="home">الرجوع للرئيسية</button></div></div>'}
 function cartEntries(){return Object.entries(state.cart).map(([id,qty])=>({p:state.products.find(p=>p.id===id),qty:Number(qty)})).filter(x=>x.p&&x.qty>0)}
@@ -327,18 +340,20 @@ async function render(){
  if(state.route!==route)return;
  if(state.catalogFailure)content='<div class="connection-notice" role="alert">'+icon("circle-alert",20)+' <span>تعذّر الاتصال بقاعدة بيانات بازو. تأكد من الإنترنت ثم أعد المحاولة.</span> <button class="btn outline" id="retryCatalog">'+icon("refresh",16)+' إعادة المحاولة</button></div>'+content;
  $("#app").innerHTML=content;$("#app").querySelectorAll("form").forEach(f=>f.noValidate=true);
+ if(pendingScroll){const destination=pendingScroll;pendingScroll=null;scrollToContent(destination)}
  if(route==="cart"){const g=$("#cartGovernorate");if(g){g.value=state.selectedGovernorate;g.addEventListener("change",()=>state.selectedGovernorate=g.value);}shippingBind("#cartGovernorate","#shippingPrice","#grandTotal");if(g)g.dispatchEvent(new Event("change"))}
  if(route==="checkout"){const g=$("#orderGovernorate");if(g)g.value=state.selectedGovernorate;shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal");g?.dispatchEvent(new Event("change"))}
  if(route==="admin")bindAdmin();
 }
 document.addEventListener("click",async e=>{
- const b=e.target.closest("button,[data-detail]");if(!b)return;
+ const b=e.target.closest('button,[data-detail],a[href^="#/"]');if(!b)return;
+ if(b.tagName==="A"&&b.getAttribute("href")?.startsWith("#/")){e.preventDefault();go(decodeURIComponent(b.getAttribute("href").slice(2)));return}
  if(b.dataset.provinceContext){openProvincePicker(b.dataset.provinceContext);return}
  if(b.dataset.pickProvince){chooseProvince(b.dataset.pickProvince,b.dataset.provinceTarget);return}
  if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();go(b.dataset.go);return}
- if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.category=c?String(c.id):"";state.brand="";state.q="";go("categories");return}
- if(b.dataset.brand){state.brand=b.dataset.brand;state.category="";state.q="";go("categories");return}
- if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories");return}
+ if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.category=c?String(c.id):"";state.brand="";state.q="";go("categories","#catalogFilters");return}
+ if(b.dataset.brand){state.brand=b.dataset.brand;state.category="";state.q="";go("categories","#catalogFilters");return}
+ if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories","#catalogFilters");return}
  if(b.dataset.galleryIndex!==undefined){changeGallery(Number(b.dataset.galleryIndex));return}
  if(b.dataset.galleryStep){changeGallery((state.galleryIndex||0)+Number(b.dataset.galleryStep));return}
  if(b.dataset.add){add(b.dataset.add);return}
@@ -355,9 +370,9 @@ document.addEventListener("click",async e=>{
  if(b.id==="retryCatalog"){await loadCatalog();render();return}
  if(b.id==="resetPassword"){const email=$('#authForm input[name="email"]')?.value.trim();if(!email)return notify("اكتب البريد الإلكتروني أولاً");const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#/account"});notify(error?error.message:"إذا البريد مسجل، راح توصلك رسالة إعادة تعيين كلمة المرور");return}
  if(b.id==="signOut"){await sb.auth.signOut();state.user=null;state.admin=false;state.adminRole=null;state.adminPermissions={};renderCategoryNav();notify("تم تسجيل الخروج");go("home");return}
- if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;state.editProduct=null;render();return}
- if(b.dataset.editProduct){state.editProduct=b.dataset.editProduct;render();return}
- if(b.id==="newProduct"){state.editProduct="new";render();return}
+ if(b.dataset.adminTab){state.adminTab=b.dataset.adminTab;state.editProduct=null;pendingScroll="#adminTabContent";render();return}
+ if(b.dataset.editProduct){state.editProduct=b.dataset.editProduct;pendingScroll="#adminTabContent";render();return}
+ if(b.id==="newProduct"){state.editProduct="new";pendingScroll="#adminTabContent";render();return}
  if(b.dataset.editPromo){showPromoEditor(b.dataset.editPromo);return}
  if(b.id==="newPromo"){showPromoEditor("new");return}
 });
@@ -365,10 +380,10 @@ document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.
 let searchDebounce;document.addEventListener("input",e=>{
  if(e.target.id==="provinceSearch"){const q=e.target.value.trim();document.querySelectorAll(".province-item").forEach(x=>x.hidden=!x.textContent.includes(q));return}
  if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
-document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target);if(id==="adminMemberForm")await saveMember(e.target)});
+document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target);if(id==="adminMemberForm")await saveMember(e.target)});
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
-window.addEventListener("hashchange",render);
+window.addEventListener("hashchange",()=>{if(!pendingScroll)pendingScroll="#app";render()});
 setInterval(()=>{if(state.route!=="home"||document.hidden||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;const hero=$("#heroSlider");if(!hero)return;state.promoIndex=(state.promoIndex+1)%storefrontSlides().length;hero.innerHTML=drawHero();hero.className="merch-slider alt-"+(state.promoIndex%3)},7000);
 sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(async()=>{await refreshAuth();if(["account","admin","checkout"].includes(state.route))render()},0)}});
 persist();
