@@ -19,7 +19,7 @@ assert.match(admin,/sb\.storage\.from\("product-images"\)\.upload/,"Product uplo
 assert.match(admin,/class="media-size-ok"/,"Compressed image preview missing");
 assert.match(app,/Always prefer the explicitly selected cover/,"Main cover must appear first across gallery and cards");
 assert.match(css,/\.main-photo-picker\{/,"Branded image picker styling missing");
-assert.match(html,/safesave27/,"Image upload release cache version missing");
+assert.match(html,/orders28/,"Image upload release cache version missing");
 
 const from=admin.indexOf("const MAX_IMAGE_BYTES=15*1024;");
 const to=admin.indexOf("function editor(p={})",from);
