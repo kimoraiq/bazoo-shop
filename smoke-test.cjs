@@ -77,7 +77,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/imageupload21/,"asset cache bust missing");
+ assert.match(html,/banners1mb22/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
