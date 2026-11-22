@@ -275,7 +275,7 @@ async function adminOrdersPage(){
  +'<div class="orders-summary-grid"><div class="orders-summary-box"><small>طلبات جديدة</small><strong>'+newCount+'</strong><span>'+icon("clock",14)+' تنتظر المراجعة</span></div><div class="orders-summary-box"><small>قيد التجهيز</small><strong>'+packingCount+'</strong><span>'+icon("package",14)+' تتم معالجتها</span></div><div class="orders-summary-box"><small>قيد التوصيل</small><strong>'+shippedCount+'</strong><span>'+icon("truck",14)+' في الطريق</span></div><div class="orders-summary-box"><small>مكتملة</small><strong>'+deliveredCount+'</strong><span>'+icon("check-circle",14)+' تم تسليمها</span></div></div>'
  +'<div class="orders-toolbar"><div class="orders-filter-list">'+choices.map(([key,title,count])=>'<button type="button" data-order-filter="'+key+'" class="'+(filter===key?'active':'')+'">'+title+' <span>'+count+'</span></button>').join("")+'</div>'
  +'<label class="orders-search-input">'+icon("search",17)+'<input id="adminOrdersSearch" type="search" autocomplete="off" placeholder="ابحث بالرقم أو العميل أو المنتج" aria-label="البحث عن طلب" value="'+esc(state.orderSearch||"")+'"></label></div>'
- +'<div class="orders-results" id="adminOrdersResults">'+(shown.length?shown.map(renderAdminOrder).join(""):'<div class="orders-empty">'+icon("shopping-bag",28)+'<h3>لا توجد طلبات في هذا القسم</h3><p>يمكنك اختيار حالة أخرى أو تحديث الطلبات.</p></div>')+'</div>'
+ +'<div class="orders-results" id="adminOrdersResults">'+(shown.length?shown.map(renderAdminOrder).join(""):'<div class="orders-empty">'+icon("shopping-bag",28)+'<h3>لا توجد طلبات في هذا القسم</h3><p>يمكنك اختيار حالة أخرى أو تحديث الطلبات.</p></div>')+'<div id="ordersSearchEmpty" class="orders-empty" hidden><h3>لا توجد نتائج للبحث</h3><p>جرّب البحث برقم الطلب أو اسم العميل أو المنتج.</p></div></div>'
  +'</section>';
 }
 
@@ -321,12 +321,14 @@ async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
   // Stay at the order the manager just updated, rather than jumping to the top.
   const card=document.getElementById("manage-order-"+orderId);
   if(card&&card.scrollIntoView)card.scrollIntoView({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?"auto":"smooth",block:"nearest"});
+  return true;
  }catch(error){
   control.value=previous;
   state.orderFeedback??={};
   state.orderFeedback[orderId]={error:true,message:"تعذّر حفظ الحالة: "+(error.message||"خطأ غير متوقع.")};
   notify(state.orderFeedback[orderId].message);
   await render();
+  return false;
  }finally{control.disabled=false}
 }
 function bindOrderOperations(){
@@ -335,8 +337,8 @@ function bindOrderOperations(){
   if(next==="cancelled"&&old!=="cancelled"){
    select.value=old;
    confirmAction("تأكيد إلغاء الطلب","سيُلغى الطلب بالكامل وتُعاد المنتجات إلى المخزون. لا يمكن إعادة تفعيل الطلب الملغي.",async()=>{
-    await persistOrderStatus(id,"cancelled",select);
-    return false; // replaced below
+    const result=await persistOrderStatus(id,"cancelled",select);
+    return result;
    });
    // The confirmation callback can also keep the dialog open on a rejected edit.
    return;
