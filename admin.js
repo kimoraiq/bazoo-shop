@@ -578,5 +578,5 @@ async function saveTaxonomy(form){
  if(result.error){notify("تعذّر الحفظ: "+result.error.message);return}
  closeModal();await loadCatalog();notify("تم الحفظ وتحديث المتجر");render();
 }
-return {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
+return {adminPage,bindAdmin,saveProduct,saveDiscountOnly,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
 }
