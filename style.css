@@ -1181,3 +1181,12 @@ body{background:#fbfafc;color:var(--ink)}
 @media(prefers-reduced-motion:reduce){
   .bottomnav button,.header .header-action{transition:none!important}
 }
+
+
+/* Explicit delivery visibility across breakpoints: never show both mobile and desktop captions */
+.header .delivery-note .delivery-desktop{display:block!important}
+.header .delivery-note .delivery-mobile{display:none!important}
+@media(max-width:600px){
+ .header .delivery-note .delivery-desktop{display:none!important}
+ .header .delivery-note .delivery-mobile{display:block!important}
+}
