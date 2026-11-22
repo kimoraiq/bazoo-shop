@@ -342,8 +342,8 @@ async function refreshAuth(){
  try{
   const {data,error}=await sb.auth.getUser();
   state.user=data?.user||null;
-  if(error)state.authError=error.message||"تعذّر التحقق من جلسة تسجيل الدخول.";
   await checkAdmin();
+  if(error)state.authError=error.message||"تعذّر التحقق من جلسة تسجيل الدخول.";
  }catch(err){
   state.user=null;state.admin=false;state.adminRole=null;state.adminPermissions={};
   state.authError=err.message||"تعذّر الاتصال بخدمة تسجيل الدخول.";
