@@ -146,6 +146,33 @@ async function authSubmit(f){
  await refreshAuth();go(state.checkoutPending?"checkout":"account");
  }catch(e){$("#authMessage").textContent="تعذر الدخول: "+e.message}finally{button.disabled=false}
 }
+
+async function checkAdmin(){
+ if(!state.user){state.admin=false;return}
+ const {data,error}=await sb.from("admin_members").select("user_id").eq("user_id",state.user.id).maybeSingle();
+ state.admin=!error&&!!data;
+}
+async function loadCatalog(){
+ const requests=[
+  ["categories",()=>sb.from("categories").select("*").order("sort_order")],
+  ["brands",()=>sb.from("brands").select("*").order("name")],
+  ["products",()=>sb.from("products").select("*").order("created_at",{ascending:false})],
+  ["rates",()=>sb.from("shipping_rates").select("*").order("governorate")],
+  ["promos",()=>sb.from("promotions").select("*").order("sort_order")]
+ ];
+ const results=await Promise.allSettled(requests.map(async ([name,request])=>{
+  const result=await request();
+  if(result.error)throw Error(name+": "+result.error.message);
+  return result.data||[];
+ }));
+ let failed=false;
+ results.forEach((out,i)=>{
+  if(out.status==="fulfilled")state[requests[i][0]]=out.value;
+  else {failed=true;console.warn("BAZOO catalog:",out.reason);}
+ });
+ state.catalogFailure=failed;
+ return !failed;
+}
 async function refreshAuth(){const {data}=await sb.auth.getUser();state.user=data?.user||null;await checkAdmin()}
 async function submitOrder(f){
  const d=new FormData(f),p=String(d.get("phone")).trim();
