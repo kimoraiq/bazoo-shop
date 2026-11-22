@@ -11,6 +11,9 @@ assert.match(css,/\.header \.brand img\{[\s\S]*?object-fit:contain!important/,"h
 assert.match(css,/\.header \.search\{[\s\S]*?background:#f8f5fc!important/,"search must harmonize with the new header");
 assert.match(css,/@media\(max-width:600px\)\{[\s\S]*?\.header \.brand\{[\s\S]*?order:1/,"mobile brand should be in the first row");
 assert.doesNotMatch(css,/BAZOO identity ribbon/,"detached ribbon styling must be removed");
+assert.match(css,/BAZOO purple category navigation/,"purple nav styling missing");
+assert.match(css,/\.category-topbar\{\s*background:#5822af!important/,"category nav should use BAZOO purple");
+assert.match(css,/\.category-nav-link \.svg-icon\{color:#fff!important/,"category icons should be white");
 const nodes=new Map(), handlers=new Map(), data=new Map();
 function node(key){
  if(!nodes.has(key))nodes.set(key,{
@@ -59,7 +62,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/bazooheader14/,"asset cache bust missing");
+ assert.match(html,/purplenav15/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
