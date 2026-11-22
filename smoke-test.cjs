@@ -4,14 +4,13 @@ const assert=require("node:assert/strict");
 const source=fs.readFileSync("bundle.js","utf8");
 const html=fs.readFileSync("index.html","utf8");
 const css=fs.readFileSync("style.css","utf8");
-assert.match(css,/BAZOO identity ribbon/,"connected white logo ribbon is missing");
-assert.match(css,/border-radius:16px 0 0 16px!important/,"ribbon must open flush against page edge");
-assert.match(css,/margin-inline-start:-13px!important/,"mobile ribbon must reach screen edge");
-assert.match(css,/height:106px!important/,"desktop logo strip must match full logo proportions");
-assert.match(css,/height:71px!important/,"mobile logo strip must fill logo height");
-assert.match(css,/padding:0!important/,"brand strip should have zero inner spacing");
-assert.match(css,/background:#fff!important/,"logo ribbon should be white");
-assert.match(css,/\.header \.brand img\s*\{[\s\S]*?object-fit:contain!important/,"horizontal logo should remain fully visible");
+assert.match(css,/BAZOO unified identity header/,"unified header style missing");
+assert.match(css,/\.header\{\s*background:#fff!important/,"main header must be white edge to edge");
+assert.match(css,/\.header \.brand\{[\s\S]*?background:transparent!important/,"logo must not have its own chip");
+assert.match(css,/\.header \.brand img\{[\s\S]*?object-fit:contain!important/,"horizontal brand must retain natural proportions");
+assert.match(css,/\.header \.search\{[\s\S]*?background:#f8f5fc!important/,"search must harmonize with the new header");
+assert.match(css,/@media\(max-width:600px\)\{[\s\S]*?\.header \.brand\{[\s\S]*?order:1/,"mobile brand should be in the first row");
+assert.doesNotMatch(css,/BAZOO identity ribbon/,"detached ribbon styling must be removed");
 const nodes=new Map(), handlers=new Map(), data=new Map();
 function node(key){
  if(!nodes.has(key))nodes.set(key,{
@@ -60,7 +59,7 @@ const context={
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
  assert.match(source,/compact-categories/,"compact SVG categories missing");
- assert.match(html,/ribbon13/,"asset cache bust missing");
+ assert.match(html,/bazooheader14/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
  assert.match(source,/function changeGallery\(/,"multi-photo gallery interactions missing");
