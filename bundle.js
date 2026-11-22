@@ -1,4 +1,4 @@
-/* BAZOO Fusha locale and accessible smooth navigation */
+/* BAZOO reliable product and discount saves; image errors no longer block prices */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -247,7 +247,7 @@ function editor(p={}){
  +'<label class="formgroup fullspan">وصف المنتج<textarea name="description" class="field" rows="4">'+esc(p.description||"")+'</textarea></label>'
  +'<label class="formgroup fullspan">المواصفات <span class="form-help">اكتب كل مواصفة في سطر مستقل، مثال: اللون: أسود</span><textarea name="specifications" class="field" rows="4" placeholder="اللون: أسود&#10;الموديل: ...">'+esc(specs)+'</textarea></label>'
  +'<div class="fullspan image-editor"><div class="image-editor-heading">'+icon("image",22)+' <div><h3>صور المنتج</h3><p>تُضغط كل صورة تلقائياً إلى 15 كيلوبايت أو أقل قبل رفعها.</p></div></div>'
- +'<div class="main-photo-editor"><div class="main-photo-heading"><strong>'+icon("image",18)+' الصورة الرئيسية للمنتج *</strong><small>ارفع الصورة مباشرةً من جهازك بدلاً من إدخال رابط. يمكنك استبدالها في أي وقت.</small></div>'
+ +'<div class="main-photo-editor"><div class="main-photo-heading"><strong>'+icon("image",18)+' الصورة الرئيسية للمنتج</strong><small>يمكن رفع صورة رئيسية من جهازك أو استبدالها لاحقاً؛ ولن يمنع غياب الصورة حفظ بيانات المنتج أو خصمه.</small></div>'
  +'<div class="main-photo-preview" id="mainPhotoPreview">'+(safeImg(p.image_url)?'<img src="'+safeImg(p.image_url)+'" alt="الصورة الرئيسية الحالية"><span class="media-existing-label">الصورة الحالية</span>':'<span class="empty-media-preview">'+icon("image",28)+' اختر الصورة الرئيسية</span>')+'</div>'
  +'<label class="main-photo-picker">'+icon("upload",17)+' <span>اختيار صورة رئيسية من الجهاز</span><input type="file" name="coverPhoto" accept="image/jpeg,image/png,image/webp" aria-label="اختيار الصورة الرئيسية للمنتج"></label></div>'
  +(p.id?gallery:'<p class="subtle">ستظهر الصور الإضافية هنا بعد حفظ المنتج.</p>')
@@ -257,7 +257,9 @@ function editor(p={}){
  +'<label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label>'
  +'<label class="formgroup">منتج مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
  +'<label class="formgroup">إظهار بصفحة العروض بدون خصم<select name="promoted_offer" class="field"><option value="false" '+(!standaloneOffer?'selected':'')+'>لا</option><option value="true" '+(standaloneOffer?'selected':'')+'>نعم</option></select></label>'
- +'<button type="submit" class="btn primary fullspan">'+icon("check",18)+' حفظ المنتج وصوره</button></form></div>';
+ +'<div id="productSaveStatus" class="product-save-status fullspan" role="status" aria-live="polite" hidden></div>'
+ +'<div class="product-save-actions fullspan"><button type="submit" class="btn primary">'+icon("check",18)+' حفظ المنتج</button>'
+ +(p.id?'<button type="button" id="saveDiscountOnly" class="btn outline">'+icon("percent",17)+' حفظ السعر والخصم فقط</button>':'')+'</div></form></div>';
 }
 
 const staffScopes=[
@@ -398,6 +400,9 @@ document.querySelectorAll("[data-admin-img-up]").forEach(btn=>btn.onclick=async(
  await loadCatalog();notify("تم تغيير ترتيب الصور");render();
 });
 const f=document.querySelector("#adminProductForm");if(f){
+ const discountSave=f.querySelector("#saveDiscountOnly");
+ if(discountSave)discountSave.onclick=()=>saveDiscountOnly(f);
+
 const p=state.products.find(x=>x.id===state.editProduct);
 if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){if(f.elements[key])f.elements[key].value=String(p[key]??"")}
  const originalInput=f.elements.original_price_iqd,discountInput=f.elements.discount_percent,previewRoot=f.querySelector("#discountPreview");
@@ -434,59 +439,127 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
 document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status);notify(error?error.message:"تم تحديث حالة الطلب ")});
 document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g);if(error)return notify(error.message);await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
 }
-async function saveProduct(form){
- const f=new FormData(form),id=String(f.get("id")||"");
- const priceInfo=calculateDiscount(f.get("original_price_iqd"),f.get("discount_percent")||0);
- if(!priceInfo)return notify("تحقق من السعر الأصلي ونسبة الخصم. يجب أن يكون السعر النهائي أكبر من صفر، وأن تتراوح نسبة الخصم بين 0% و99%.");
- const specs={};
- for(const line of String(f.get("specifications")||"").split("\n")){
-  const i=line.indexOf(":");if(i<1)continue;
-  const key=line.slice(0,i).trim(),value=line.slice(i+1).trim();
-  if(key&&value)specs[key.slice(0,90)]=value.slice(0,300);
+function setProductSaveStatus(form,message,type="error"){
+ const box=form?.querySelector?.("#productSaveStatus");
+ if(box){
+  box.hidden=false;
+  box.className="product-save-status fullspan "+(type==="success"?"product-status-success":type==="warning"?"product-status-warning":"product-status-error");
+  box.textContent=message;
+  if(type!=="success")box.scrollIntoView?.({behavior:"smooth",block:"nearest"});
  }
- const v={name:String(f.get("name")).trim(),category_id:Number(f.get("category_id")),
-  brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
-  price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
-  stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,
-  description:String(f.get("description")||""),specifications:specs,
-  image_url:state.products.find(p=>p.id===id)?.image_url||null,
-  active:f.get("active")==="true",featured:f.get("featured")==="true",
-  on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",is_demo:f.get("is_demo")==="true"};
- if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
- const mainFile=form.elements.coverPhoto?.files?.[0]||null;
- const photos=Array.from(form.elements.photos.files||[]);
- if(photos.length>8)return notify("الحد الأقصى 8 صور إضافية");
- if(!mainFile&&!v.image_url)return notify("يرجى رفع صورة رئيسية من جهازك قبل حفظ المنتج.");
- const btn=form.querySelector('button[type="submit"]');btn.disabled=true;
+ notify(message);
+}
+function getProductPriceInfo(form){
+ const original=form.elements.original_price_iqd?.value??"";
+ const percent=form.elements.discount_percent?.value??"";
+ if(String(original).trim()==="")throw Error("يرجى إدخال السعر الأصلي قبل الحفظ.");
+ const value=calculateDiscount(original,percent===""?0:percent);
+ if(!value)throw Error("تحقق من السعر الأصلي ونسبة الخصم (من 0% إلى 99%)، ويجب أن يكون السعر بعد الخصم أكبر من صفر.");
+ return value;
+}
+async function saveDiscountOnly(form){
+ const id=String(form.elements.id?.value||"");
+ if(!id)return setProductSaveStatus(form,"يرجى حفظ المنتج أولاً قبل تعديل الخصم بصورة مستقلة.");
+ const btn=form.querySelector("#saveDiscountOnly");
+ if(btn?.disabled)return;
+ if(btn)btn.disabled=true;
  try{
-  const newlyUploaded=[];
+  const priceInfo=getProductPriceInfo(form);
+  const promotion=form.elements.promoted_offer?.value==="true";
+  const {data,error}=await sb.from("products").update({
+   price_iqd:priceInfo.price,
+   compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
+   on_sale:priceInfo.percentage>0||promotion
+  }).eq("id",id).select("*").single();
+  if(error||!data)throw Error(error?.message||"لم يُحفظ التعديل في قاعدة البيانات.");
+  await loadCatalog();
+  setProductSaveStatus(form,"تم حفظ السعر والخصم بنجاح.", "success");
+  state.editProduct=id;
+ }catch(err){setProductSaveStatus(form,"تعذّر حفظ الخصم: "+err.message);}
+ finally{if(btn)btn.disabled=false}
+}
+async function saveProduct(form){
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit?.disabled)return;
+ if(submit)submit.disabled=true;
+ let savedRecord=null;
+ try{
+  const f=new FormData(form);
+  const id=String(f.get("id")||"").trim();
+  const priceInfo=getProductPriceInfo(form);
+  const name=String(f.get("name")||"").trim();
+  const category=Number(f.get("category_id"));
+  const stock=Number(f.get("stock"));
+  if(name.length<2||name.length>180)throw Error("يرجى إدخال اسم منتج صحيح لا يتجاوز 180 حرفاً.");
+  if(!Number.isSafeInteger(category)||category<1)throw Error("يرجى اختيار قسم المنتج.");
+  if(!Number.isSafeInteger(stock)||stock<0)throw Error("يرجى إدخال كمية صحيحة للمخزون.");
+  const photos=Array.from(form.elements.photos?.files||[]);
+  if(photos.length>8)throw Error("يمكن رفع ثماني صور إضافية كحد أقصى.");
+  const mainFile=form.elements.coverPhoto?.files?.[0]||null;
+  const specs={};
+  for(const line of String(f.get("specifications")||"").split("\n")){
+   const i=line.indexOf(":");if(i<1)continue;
+   const key=line.slice(0,i).trim(),value=line.slice(i+1).trim();
+   if(key&&value)specs[key.slice(0,90)]=value.slice(0,300);
+  }
+  const current=state.products.find(p=>p.id===id);
+  const v={
+   name,category_id:category,brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
+   price_iqd:priceInfo.price,
+   compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
+   stock,sku:String(f.get("sku")||"").trim()||null,
+   description:String(f.get("description")||""),specifications:specs,
+   image_url:current?.image_url||null,
+   active:f.get("active")==="true",featured:f.get("featured")==="true",
+   on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",
+   is_demo:f.get("is_demo")==="true"
+  };
+  if(submit)submit.textContent="جارٍ حفظ بيانات المنتج والسعر...";
+  // Save all product and discount fields before processing images. A failed photo
+  // upload must never discard a successful price edit or product creation.
+  const stored=id?await sb.from("products").update(v).eq("id",id).select("*").single()
+                 :await sb.from("products").insert(v).select("*").single();
+  if(stored.error||!stored.data)throw Error(stored.error?.message||"لم تؤكد قاعدة البيانات حفظ المنتج.");
+  savedRecord=stored.data;
+  if(form.elements.id)form.elements.id.value=savedRecord.id;
+  state.editProduct=savedRecord.id;
+  const uploaded=[];
   if(mainFile){
-   btn.textContent="جارٍ ضغط الصورة الرئيسية ورفعها...";
-   v.image_url=await uploadProductImage(mainFile);
-   newlyUploaded.push(v.image_url);
+   if(submit)submit.textContent="جارٍ ضغط الصورة الرئيسية ورفعها...";
+   const coverURL=await uploadProductImage(mainFile);
+   uploaded.push(coverURL);
+   const coverUpdate=await sb.from("products").update({image_url:coverURL}).eq("id",savedRecord.id).select("id,image_url").single();
+   if(coverUpdate.error||!coverUpdate.data)throw Error("تم حفظ المنتج، لكن تعذّر تحديث صورته الرئيسية: "+(coverUpdate.error?.message||"تعذّر التأكيد."));
   }
   for(let i=0;i<photos.length;i++){
-   btn.textContent="جارٍ ضغط الصورة ورفعها "+(i+1)+" من "+photos.length;
-   const photoURL=await uploadProductImage(photos[i]);
-   newlyUploaded.push(photoURL);
+   if(submit)submit.textContent="جارٍ ضغط ورفع الصورة "+(i+1)+" من "+photos.length+"...";
+   uploaded.push(await uploadProductImage(photos[i]));
   }
-  const saved=id?await sb.from("products").update(v).eq("id",id).select("*").single()
-    :await sb.from("products").insert(v).select("*").single();
-  if(saved.error)throw Error(saved.error.message);
-  const record=saved.data;
-  const gallery=state.productImages.filter(x=>x.product_id===record.id);
+  const gallery=state.productImages.filter(p=>p.product_id===savedRecord.id);
   const existingURLs=new Set(gallery.map(x=>x.image_url));
-  if(!gallery.length&&record.image_url&&!newlyUploaded.includes(record.image_url))newlyUploaded.unshift(record.image_url);
-  const additions=newlyUploaded.filter(url=>!existingURLs.has(url));
+  if(!gallery.length&&savedRecord.image_url&&!uploaded.includes(savedRecord.image_url))uploaded.unshift(savedRecord.image_url);
+  const additions=uploaded.filter(url=>!existingURLs.has(url));
   if(additions.length){
    const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
-   const rows=additions.map((url,i)=>({product_id:record.id,image_url:url,alt_text:v.name,sort_order:maxOrder+i+1}));
-   const res=await sb.from("product_images").insert(rows);
-   if(res.error)throw Error("تم حفظ المنتج لكن تعذّر تسجيل بعض الصور: "+res.error.message);
+   const rows=additions.map((url,i)=>({product_id:savedRecord.id,image_url:url,alt_text:name,sort_order:maxOrder+i+1}));
+   const result=await sb.from("product_images").insert(rows);
+   if(result.error)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+result.error.message);
   }
-  await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج وصوره بعد ضغطها إلى 15 كيلوبايت");render();
- }catch(e){notify("تعذّر الحفظ: "+e.message);await loadCatalog();}
- finally{btn.disabled=false;btn.innerHTML=icon("check",18)+" حفظ المنتج وصوره";}
+  await loadCatalog();
+  state.editProduct=null;
+  notify("تم حفظ المنتج والسعر والخصم بنجاح.");
+  await render();
+ }catch(error){
+  const saved=!!savedRecord;
+  if(saved){
+   try{await loadCatalog()}catch(e){}
+   setProductSaveStatus(form,"حُفظ المنتج والسعر والخصم، ولكن حدث خطأ في معالجة الصور: "+error.message,"warning");
+  }else{
+   setProductSaveStatus(form,"تعذّر حفظ المنتج: "+error.message);
+  }
+ }finally{
+  if(submit){submit.disabled=false;submit.innerHTML=icon("check",18)+" حفظ المنتج"}
+ }
 }
 function showPromoEditor(id){
  const p=state.promos.find(x=>x.id===id)||{};
@@ -626,7 +699,7 @@ async function saveTaxonomy(form){
  if(result.error){notify("تعذّر الحفظ: "+result.error.message);return}
  closeModal();await loadCatalog();notify("تم الحفظ وتحديث المتجر");render();
 }
-return {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
+return {adminPage,bindAdmin,saveProduct,saveDiscountOnly,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
 }
 ;
 
@@ -662,17 +735,29 @@ function confirmAction(title,description,callback){
 }
 function validateSiteForm(form){
  const fields=Array.from(form.querySelectorAll("input,select,textarea"));
+ const fail=(field,message)=>{
+  const box=form.querySelector("#productSaveStatus");
+  if(box){
+   box.hidden=false;
+   box.className="product-save-status fullspan product-status-error";
+   box.textContent=message;
+   box.scrollIntoView?.({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?"auto":"smooth",block:"nearest"});
+  }
+  notify(message);
+  field.focus?.();
+  return false;
+ };
  for(const field of fields){
   if(field.disabled||field.type==="hidden"||field.type==="file")continue;
   const value=String(field.value||"").trim();
   const label=field.closest("label")?.textContent?.trim()?.slice(0,65)||"الحقل";
-  if(field.required&&!value){notify("يرجى تعبئة: "+label);field.focus();return false}
+  if(field.required&&!value)return fail(field,"يرجى تعبئة: "+label);
   if(!value)continue;
-  if(field.type==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)){notify("يرجى كتابة بريد إلكتروني صحيح");field.focus();return false}
-  if(field.minLength>0&&value.length<field.minLength){notify("القيمة قصيرة في: "+label);field.focus();return false}
-  if(field.maxLength>0&&value.length>field.maxLength){notify("القيمة طويلة في: "+label);field.focus();return false}
-  if(field.pattern&&!(new RegExp("^(?:"+field.pattern+")$")).test(value)){notify("صيغة البيانات غير صحيحة في: "+label);field.focus();return false}
-  if(field.type==="number"&&(Number.isNaN(Number(value))||(field.min!==""&&Number(value)<Number(field.min))||(field.max!==""&&Number(value)>Number(field.max)))){notify("أدخل رقماً صحيحاً في: "+label);field.focus();return false}
+  if(field.type==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return fail(field,"يرجى إدخال بريد إلكتروني صحيح.");
+  if(field.minLength>0&&value.length<field.minLength)return fail(field,"القيمة قصيرة في: "+label);
+  if(field.maxLength>0&&value.length>field.maxLength)return fail(field,"القيمة طويلة في: "+label);
+  if(field.pattern&&!(new RegExp("^(?:"+field.pattern+")$")).test(value))return fail(field,"صيغة البيانات غير صحيحة في: "+label);
+  if(field.type==="number"&&(Number.isNaN(Number(value))||(field.min!==""&&Number(value)<Number(field.min))||(field.max!==""&&Number(value)>Number(field.max))))return fail(field,"أدخل رقماً صحيحاً في: "+label);
  }
  return true;
 }
