@@ -65,8 +65,8 @@ function sectionHead(kicker,title,subtitle=""){return '<div class="section-head"
 
 function imagesForProduct(p){
  const gallery=state.productImages.filter(img=>img.product_id===p.id).sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.image_url).filter(safeImg);
- if(safeImg(p.image_url)&&!gallery.includes(p.image_url))gallery.unshift(p.image_url);
- return [...new Set(gallery)];
+ // Always prefer the explicitly selected cover, regardless of gallery order.
+ return [...new Set([...(safeImg(p.image_url)?[p.image_url]:[]),...gallery])];
 }
 function productCard(p){
  const img=imagesForProduct(p)[0]||"",off=p.compare_at_iqd>p.price_iqd&&p.compare_at_iqd>0?Math.round(100*(p.compare_at_iqd-p.price_iqd)/p.compare_at_iqd):0;
