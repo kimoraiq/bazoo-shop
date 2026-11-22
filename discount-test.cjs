@@ -30,5 +30,5 @@ assert.match(app,/const links=\(state\.admin\?'<button type="button" class="cate
 assert.doesNotMatch(app,/data-go="admin">لوحة إدارة المتجر<\/button>/,"Old account-page admin action must be removed");
 assert.match(css,/\.category-nav \.admin-top-action\{/,"Top admin button styling missing");
 assert.match(css,/\.discount-editor\{/,"Discount editor layout missing");
-assert.match(html,/safesave27/,"Update front-end cache before release");
+assert.match(html,/orders28/,"Update front-end cache before release");
 console.log("PASS BAZOO: role-gated top admin shortcut and percentage discounts (0–99%)");
