@@ -290,14 +290,22 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
  originalInput.addEventListener("input",updateDiscountPreview);
  discountInput.addEventListener("input",updateDiscountPreview);
  updateDiscountPreview();
+ const mainInput=f.elements.coverPhoto;
+ if(mainInput)mainInput.addEventListener("change",()=>{
+  const file=mainInput.files?.[0],target=document.querySelector("#mainPhotoPreview");
+  if(file&&target)previewMediaUpload(file,target);
+ });
  const uploader=f.elements.photos;
  if(uploader)uploader.addEventListener("change",()=>{
   const root=document.querySelector("#photoUploadPreview");if(!root)return;
   root.innerHTML="";
-  Array.from(uploader.files||[]).slice(0,8).forEach(file=>{
-   const url=URL.createObjectURL(file),wrap=document.createElement("div"),img=document.createElement("img");
-   img.src=url;img.alt=file.name;img.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
-   wrap.append(img);root.append(wrap);
+  const files=Array.from(uploader.files||[]);
+  if(files.length>8){notify("الحد الأقصى 8 صور إضافية");return}
+  files.forEach((file)=>{
+   const tile=document.createElement("div");
+   tile.className="compressed-photo-tile";
+   root.append(tile);
+   previewMediaUpload(file,tile);
   });
  });
 }
@@ -319,41 +327,42 @@ async function saveProduct(form){
   price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,
   stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,
   description:String(f.get("description")||""),specifications:specs,
-  image_url:String(f.get("image_url")||"").trim()||null,
+  image_url:state.products.find(p=>p.id===id)?.image_url||null,
   active:f.get("active")==="true",featured:f.get("featured")==="true",
   on_sale:priceInfo.percentage>0||f.get("promoted_offer")==="true",is_demo:f.get("is_demo")==="true"};
  if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
- if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("رابط الصورة لازم يكون HTTPS");
+ const mainFile=form.elements.coverPhoto?.files?.[0]||null;
  const photos=Array.from(form.elements.photos.files||[]);
- if(photos.length>8)return notify("حد أقصى 8 صور في كل رفع");
+ if(photos.length>8)return notify("الحد الأقصى 8 صور إضافية");
+ if(!mainFile&&!v.image_url)return notify("ارفع صورة رئيسية من جهازك حتى تحفظ المنتج");
  const btn=form.querySelector('button[type="submit"]');btn.disabled=true;
  try{
-  const uploaded=[];
-  for(let i=0;i<photos.length;i++){
-   const file=photos[i];
-   if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("صيغة الصورة غير مدعومة أو حجمها أكبر من 5MB");
-   btn.textContent="جاري رفع صورة "+(i+1)+" من "+photos.length;
-   const ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}[file.type];
-   const path="products/"+crypto.randomUUID()+"."+ext;
-   const res=await sb.storage.from("product-images").upload(path,file,{contentType:file.type});
-   if(res.error)throw Error(res.error.message);
-   uploaded.push(sb.storage.from("product-images").getPublicUrl(path).data.publicUrl);
+  const newlyUploaded=[];
+  if(mainFile){
+   btn.textContent="جاري ضغط ورفع الصورة الرئيسية...";
+   v.image_url=await uploadProductImage(mainFile);
+   newlyUploaded.push(v.image_url);
   }
-  if(!v.image_url&&uploaded.length)v.image_url=uploaded[0];
+  for(let i=0;i<photos.length;i++){
+   btn.textContent="جاري ضغط ورفع صورة "+(i+1)+" من "+photos.length;
+   const photoURL=await uploadProductImage(photos[i]);
+   newlyUploaded.push(photoURL);
+  }
   const saved=id?await sb.from("products").update(v).eq("id",id).select("*").single()
     :await sb.from("products").insert(v).select("*").single();
   if(saved.error)throw Error(saved.error.message);
-  const record=saved.data;const gallery=state.productImages.filter(x=>x.product_id===record.id);
-  if(uploaded.length){
+  const record=saved.data;
+  const gallery=state.productImages.filter(x=>x.product_id===record.id);
+  const existingURLs=new Set(gallery.map(x=>x.image_url));
+  if(!gallery.length&&record.image_url&&!newlyUploaded.includes(record.image_url))newlyUploaded.unshift(record.image_url);
+  const additions=newlyUploaded.filter(url=>!existingURLs.has(url));
+  if(additions.length){
    const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
-   const rows=uploaded.map((url,i)=>({product_id:record.id,image_url:url,alt_text:v.name,sort_order:maxOrder+i+1}));
+   const rows=additions.map((url,i)=>({product_id:record.id,image_url:url,alt_text:v.name,sort_order:maxOrder+i+1}));
    const res=await sb.from("product_images").insert(rows);
    if(res.error)throw Error("تم حفظ المنتج لكن تعذّر تسجيل بعض الصور: "+res.error.message);
-  }else if(!gallery.length&&v.image_url){
-   const res=await sb.from("product_images").insert({product_id:record.id,image_url:v.image_url,alt_text:v.name,sort_order:0});
-   if(res.error)throw Error(res.error.message);
   }
-  await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج ومعرض الصور");render();
+  await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج وصوره بعد ضغطها إلى 15 كيلوبايت");render();
  }catch(e){notify("تعذّر الحفظ: "+e.message);await loadCatalog();}
  finally{btn.disabled=false;btn.innerHTML=icon("check",18)+" حفظ المنتج وصوره";}
 }
