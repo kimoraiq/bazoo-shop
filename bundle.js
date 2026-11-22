@@ -1,4 +1,4 @@
-/* BAZOO first-party bundled store app */
+/* BAZOO shop — photo responsive and catalog driven */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -414,7 +414,12 @@ function drawHero(){
 }
 function categoryCircles(){
  const list=state.categories.length?state.categories.filter(c=>c.active&&c.parent_id).map(c=>({id:c.id,slug:c.slug,name:c.name})):homeCategoryDefaults.map(c=>({...c,id:null}));
- return '<div class="home-categories">'+list.map(c=>'<button class="round-category" '+(c.id?'data-cat="'+c.id+'"':'data-go="categories"')+'><span class="category-circle">'+icon(slugIcons[c.slug]||"grid",56)+'</span><span class="category-name">'+esc(c.name)+'</span></button>').join("")+'</div>';
+ const photos={"home-appliances":"photo-1593359677879-a4bb92f829d1","installation":"photo-1621905251189-08b45d6a269e","devices-games":"photo-1517336714731-489689fd1ca8","accessories":"photo-1505740420928-5e560c06d30e","phones":"photo-1511707171634-5f897ff02aa9","office-supplies":"photo-1497633762265-9d179a990aa6","school-supplies":"photo-1497633762265-9d179a990aa6"};
+ return '<div class="home-categories">'+list.map(c=>{
+  const p=state.products.find(p=>p.category_id===c.id&&p.active&&safeImg(p.image_url));
+  const image=safeImg(p?.image_url)||(photos[c.slug]?"https://images.unsplash.com/"+photos[c.slug]+"?auto=format&fit=crop&w=360&q=78":"");
+  return '<button class="round-category" '+(c.id?'data-cat="'+c.id+'"':'data-go="categories"')+'><span class="category-circle">'+(image?'<img class="category-thumb" src="'+image+'" alt="" loading="lazy">':'<span class="category-fallback">'+esc(c.name.charAt(0))+'</span>')+'</span><span class="category-name">'+esc(c.name)+'</span></button>';
+ }).join("")+'</div>';
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
