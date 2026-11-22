@@ -26,7 +26,7 @@ const app=createAdmin({
 });
 (async()=>{
  let page=await app.adminPage();
- assert.match(page,/المدراء والصلاحيات/,"owner needs staff tab");
+ assert.match(page,/المسؤولون والصلاحيات/,"owner needs staff tab");
  assert.match(page,/data-staff-edit/,"owner should be able to edit other administrators");
  assert.match(page,/data-staff-remove/,"owner should be able to remove other administrators");
  assert.match(page,/الحساب محمي/,"owner account must be protected");
