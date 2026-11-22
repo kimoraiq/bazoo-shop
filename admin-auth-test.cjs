@@ -38,6 +38,6 @@ const createClient=new Function("localStorage","fetch","Headers","AbortControlle
  assert.match(app,/authLoaded:false/,"Loading state must prevent premature denial while auth is pending");
  assert.match(app,/الحساب المسجّل حالياً/,"Show signed-in account for permission troubleshooting");
  assert.match(app,/retryAdminAccess/,"Retry authorization should remain available");
- assert.match(html,/safesave27/,"Front-end must use fresh CSS and JS cache versions");
+ assert.match(html,/orders28/,"Front-end must use fresh CSS and JS cache versions");
  console.log("PASS: owner JWT forwarded to server for direct role verification and inline diagnostics");
 })().catch(e=>{console.error(e);process.exitCode=1});
