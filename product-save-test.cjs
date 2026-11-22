@@ -38,6 +38,13 @@ const q=(table,op,payload)=>({
 let currentId="p-1";
 const sb={
  from(table){return {
+  select(){return {
+   eq(column,value){this.key=column;this.id=value;return this},
+   async single(){
+    if(table!=="products")return {data:null,error:{message:"Unexpected table"}};
+    return {data:{...state.products.find(p=>String(p.id)===String(this.id))},error:null};
+   }
+  }},
   update(payload){return q(table,"update",payload)},
   insert(payload){return q(table,"insert",payload)}
  }}
