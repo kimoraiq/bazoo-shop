@@ -27,6 +27,7 @@ jobs:
           node --check bundle.js
           node --check admin-panel.js
           node admin-panel-test.cjs
+          node admin-brand-ui-test.cjs
           node smoke-test.cjs
           node admin-role-test.cjs
           node discount-test.cjs
