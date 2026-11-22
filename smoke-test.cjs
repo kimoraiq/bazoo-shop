@@ -129,7 +129,7 @@ const context={
  assert.equal(scrollCalls.at(-1).key,"#categoryResults","search should scroll directly to catalog results");
  await click({target:{closest(){return {dataset:{cat:"123"}}}}});
  await context.render();
- assert.equal(scrollCalls.at(-1).key,"#catalogFilters","category navigation should scroll to filter controls");
+ assert.equal(scrollCalls.at(-1).key,"#categoryResults","category navigation should scroll directly to matching products");
  assert.match(node("#app").innerHTML,/id="catalogFilters"/,"catalog anchor missing");
  assert.match(node("#app").innerHTML,/id="categoryResults"/,"search results anchor missing");
 
