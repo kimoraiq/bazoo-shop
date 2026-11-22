@@ -41,6 +41,18 @@ const context={
  assert.match(html,/بكل أنحاء العراق/,"delivery wording missing");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
  assert.match(css,/\.merch-slider\{height:470px/,"mobile banner must have a fixed height");
+ assert.match(css,/\.merch-slider\{height:420px/,"new desktop banner height missing");
+ assert.match(css,/\.merch-slider\{height:438px/,"new mobile banner height missing");
+ assert.match(source,/function productRail\(/,"one-row carousel component missing");
+ assert.match(source,/data-rail-move/,"carousel controls missing");
+ assert.match(source,/class="merch-picture"/,"photographic banner missing");
+ assert.match(source,/async function cropBanner\(/,"desktop/mobile banner image cropping missing");
+ assert.match(source,/photo_desktop/,"desktop admin file input missing");
+ assert.match(source,/photo_mobile/,"mobile admin file input missing");
+ assert.match(source,/product_id/,"linked banner product selection missing");
+ assert.match(source,/category-thumb/,"real photo category thumbnails missing");
+ assert.match(html,/bazoo7/,"asset cache bust missing");
+
  assert.match(source,/function confirmAction\(/,"branded confirmation dialog missing");
  assert.match(source,/function removeRecord\(/,"admin product and promo deletion missing");
  assert.match(source,/demo-price-note/,"demo price labels missing");
