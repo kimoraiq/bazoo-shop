@@ -92,11 +92,14 @@ const defaultSlides=[
 ];
 function storefrontSlides(){
  const promos=state.promos.filter(p=>p.active&&p.placement==="home");
- if(promos.length)return promos.map(p=>({
-  title:p.title,subtitle:p.subtitle,demo:!!p.is_demo,
-  desktop:p.desktop_image_url||p.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url,
-  route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",cta:"تسوّق الآن"
- }));
+ if(promos.length)return promos.map(p=>{
+  const linked=state.products.find(x=>x.id===p.product_id&&x.active);
+  return {title:p.title,subtitle:p.subtitle,demo:!!p.is_demo||!!linked?.is_demo,
+   desktop:p.desktop_image_url||p.image_url||linked?.image_url,mobile:p.mobile_image_url||p.desktop_image_url||p.image_url||linked?.image_url,
+   productId:linked?.id||null,
+   route:/^#\/(home|categories|offers|cart)$/.test(p.link_url||"")?p.link_url.slice(2):"categories",
+   cta:linked?"اكتشف المنتج":"تسوّق الآن"};
+ });
  const photo=state.products.find(p=>p.active&&p.featured&&safeImg(p.image_url))?.image_url||null;
  return [{title:"تسوّق بسهولة من BAZOO",subtitle:"كل ما يحتاجه البيت من الإلكترونيات والأجهزة والقرطاسية. اختار اللي يعجبك.",desktop:photo,mobile:photo,demo:!state.products.some(p=>!p.is_demo),route:"categories",cta:"اكتشف المنتجات"}];
 }
@@ -108,7 +111,7 @@ function drawHero(){
   +picture+(picture?'<div class="merch-scrim"></div>':'')
   +'<div class="merch-content">'+(slide.demo?'<span class="merch-demo-stamp">بانر تجريبي</span>':'')
   +'<span class="merch-eyebrow">'+icon("sparkles",17)+' اختيارات BAZOO</span><h1>'+esc(slide.title)+'</h1>'
-  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" data-go="'+esc(slide.route||"categories")+'">'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
+  +'<p>'+esc(slide.subtitle||"")+'</p><div class="hero-buttons"><button class="btn accent" '+(slide.productId?'data-detail="'+esc(slide.productId)+'"':'data-go="'+esc(slide.route||"categories")+'"')+'>'+esc(slide.cta||"تسوّق الآن")+' '+icon("arrow-left",17)+'</button></div></div>'
   +'</div><div class="slider-controls"><button data-slide="-1" aria-label="العرض السابق">'+icon("chevron-right",18)+'</button>'
   +'<div class="slider-dots" aria-label="شرائح العروض">'+slides.map((p,i)=>'<button data-slide-to="'+i+'" class="'+(idx===i?'active':'')+'" aria-label="العرض '+(i+1)+'" aria-current="'+(idx===i?'true':'false')+'"></button>').join("")+'</div>'
   +'<button data-slide="1" aria-label="العرض التالي">'+icon("chevron-left",18)+'</button></div>';
