@@ -8,7 +8,7 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: bazoo-production-pages-v2
+  group: bazoo-production-pages-v3
   cancel-in-progress: true
 jobs:
   deploy:
