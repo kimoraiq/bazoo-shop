@@ -56,9 +56,51 @@ document.querySelectorAll("[data-new-taxonomy]").forEach(b=>b.onclick=()=>showTa
 document.querySelectorAll("[data-edit-taxonomy]").forEach(b=>b.onclick=()=>showTaxonomyEditor(b.dataset.editTaxonomy,b.dataset.recordId));
 document.querySelectorAll("[data-toggle-taxonomy]").forEach(b=>b.onclick=()=>toggleRecord(b.dataset.toggleTaxonomy,b.dataset.recordId));
 document.querySelectorAll("[data-delete-taxonomy]").forEach(b=>b.onclick=()=>removeRecord(b.dataset.deleteTaxonomy,b.dataset.recordId,b.dataset.deleteTaxonomy==="categories"?"الفئة":"العلامة التجارية"));
+
+const imageById=id=>state.productImages.find(x=>x.id===id);
+document.querySelectorAll("[data-admin-cover]").forEach(btn=>btn.onclick=async()=>{
+ const img=imageById(btn.dataset.adminCover);if(!img)return;
+ const {error}=await sb.from("products").update({image_url:img.image_url}).eq("id",img.product_id);
+ if(error)return notify("تعذّر تغيير الصورة الرئيسية: "+error.message);
+ await loadCatalog();notify("تم اختيار الصورة الرئيسية");render();
+});
+document.querySelectorAll("[data-admin-img-delete]").forEach(btn=>btn.onclick=()=>{
+ const img=imageById(btn.dataset.adminImgDelete);if(!img)return;
+ confirmAction("حذف صورة المنتج","تنحذف هذه الصورة من معرض المنتج ولا يمكن التراجع عن الحذف.",async()=>{
+  const p=state.products.find(x=>x.id===img.product_id);
+  const left=state.productImages.filter(x=>x.product_id===img.product_id&&x.id!==img.id).sort((a,b)=>a.sort_order-b.sort_order);
+  if(p?.image_url===img.image_url){
+   const {error}=await sb.from("products").update({image_url:left[0]?.image_url||null}).eq("id",img.product_id);
+   if(error){notify(error.message);return false}
+  }
+  const {error}=await sb.from("product_images").delete().eq("id",img.id);
+  if(error){notify(error.message);return false}
+  await loadCatalog();notify("تم حذف الصورة من المعرض");render();return true;
+ });
+});
+document.querySelectorAll("[data-admin-img-up]").forEach(btn=>btn.onclick=async()=>{
+ const img=imageById(btn.dataset.adminImgUp);if(!img)return;
+ const list=state.productImages.filter(x=>x.product_id===img.product_id).sort((a,b)=>a.sort_order-b.sort_order);
+ const i=list.findIndex(x=>x.id===img.id);if(i<1)return;
+ const prev=list[i-1];
+ const first=await sb.from("product_images").update({sort_order:prev.sort_order}).eq("id",img.id);
+ const second=await sb.from("product_images").update({sort_order:img.sort_order}).eq("id",prev.id);
+ if(first.error||second.error)return notify("تعذّر إعادة ترتيب الصور");
+ await loadCatalog();notify("تم تغيير ترتيب الصور");render();
+});
 const f=document.querySelector("#adminProductForm");if(f){
 const p=state.products.find(x=>x.id===state.editProduct);
 if(p)for(const key of ["category_id","brand_id","active","featured","on_sale","is_demo"]){if(f.elements[key])f.elements[key].value=String(p[key]??"")}
+ const uploader=f.elements.photos;
+ if(uploader)uploader.addEventListener("change",()=>{
+  const root=document.querySelector("#photoUploadPreview");if(!root)return;
+  root.innerHTML="";
+  Array.from(uploader.files||[]).slice(0,8).forEach(file=>{
+   const url=URL.createObjectURL(file),wrap=document.createElement("div"),img=document.createElement("img");
+   img.src=url;img.alt=file.name;img.addEventListener("load",()=>URL.revokeObjectURL(url),{once:true});
+   wrap.append(img);root.append(wrap);
+  });
+ });
 }
 document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status);notify(error?error.message:"تم تحديث حالة الطلب ")});
 document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g);if(error)return notify(error.message);await loadCatalog();notify("تم تحديث التوصيل ");render()});
