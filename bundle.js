@@ -1,4 +1,4 @@
-/* BAZOO standalone bundle • native first-party client • no CDN imports */
+/* BAZOO browser bundle */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -268,7 +268,7 @@ function home(){
  +'<section class="home-section home-products"><div class="row" style="align-items:end;gap:12px">'+sectionHead("المنتجات الأحدث","مختارات BAZOO")+'<button class="section-link" data-go="categories">كل المنتجات '+icon("arrow-left",16)+'</button></div>'
  +(recommendations.length?productGrid(recommendations):homeEmpty("قريباً منتجات جديدة","المنتجات الفعلية ستظهر هنا بمجرد إضافتها من لوحة الإدارة.","shopping-bag"))+'</section>'
  +'<section class="home-section">'+sectionHead("اختار العلامة اللي تثق بيها","تسوّق حسب العلامة التجارية") +brandGallery()+'</section>'
- +'<section class="benefits home-benefits"><div class="benefit"><i>'+icon("truck",25)+'</i><div><strong>التوصيل حسب المحافظة</strong><small>تُحتسب الأجور عند الطلب</small></div></div><div class="benefit"><i>'+icon("package",25)+'</i><div><strong>مخزون حقيقي</strong><small>حسب المنتجات المنشورة</small></div></div><div class="benefit"><i>'+icon("shield-check",25)+'</i><div><strong>حسابات آمنة</strong><small>حماية بيانات الزبائن</small></div></div><div class="benefit"><i>'+icon("headphones",25)+'</i><div><strong>تجربة تسوّق سهلة</strong><small>من الهاتف أو الكمبيوتر</small></div></div></section>'
+ +'<section class="benefits home-benefits"><div class="benefit"><i>'+icon("truck",25)+'</i><div><strong>التوصيل لكل العراق</strong><small>أجور التوصيل تظهر عند الطلب</small></div></div><div class="benefit"><i>'+icon("package",25)+'</i><div><strong>مخزون حقيقي</strong><small>حسب المنتجات المنشورة</small></div></div><div class="benefit"><i>'+icon("shield-check",25)+'</i><div><strong>حسابات آمنة</strong><small>حماية بيانات الزبائن</small></div></div><div class="benefit"><i>'+icon("headphones",25)+'</i><div><strong>تجربة تسوّق سهلة</strong><small>من الهاتف أو الكمبيوتر</small></div></div></section>'
  +'</div>';
 }
 function brandsPage(){
@@ -322,6 +322,33 @@ async function authSubmit(f){
  notify(mode==="signup"?"تم إنشاء الحساب":"تم تسجيل الدخول");
  await refreshAuth();go(state.checkoutPending?"checkout":"account");
  }catch(e){$("#authMessage").textContent="تعذر الدخول: "+e.message}finally{button.disabled=false}
+}
+
+async function checkAdmin(){
+ if(!state.user){state.admin=false;return}
+ const {data,error}=await sb.from("admin_members").select("user_id").eq("user_id",state.user.id).maybeSingle();
+ state.admin=!error&&!!data;
+}
+async function loadCatalog(){
+ const requests=[
+  ["categories",()=>sb.from("categories").select("*").order("sort_order")],
+  ["brands",()=>sb.from("brands").select("*").order("name")],
+  ["products",()=>sb.from("products").select("*").order("created_at",{ascending:false})],
+  ["rates",()=>sb.from("shipping_rates").select("*").order("governorate")],
+  ["promos",()=>sb.from("promotions").select("*").order("sort_order")]
+ ];
+ const results=await Promise.allSettled(requests.map(async ([name,request])=>{
+  const result=await request();
+  if(result.error)throw Error(name+": "+result.error.message);
+  return result.data||[];
+ }));
+ let failed=false;
+ results.forEach((out,i)=>{
+  if(out.status==="fulfilled")state[requests[i][0]]=out.value;
+  else {failed=true;console.warn("BAZOO catalog:",out.reason);}
+ });
+ state.catalogFailure=failed;
+ return !failed;
 }
 async function refreshAuth(){const {data}=await sb.auth.getUser();state.user=data?.user||null;await checkAdmin()}
 async function submitOrder(f){
