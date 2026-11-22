@@ -17,7 +17,7 @@ export function createClient(baseUrl, publishableKey) {
     if(!expires||expires>Date.now()/1000+60)return session.access_token;
     try{
       const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:JSON.stringify({refresh_token:session.refresh_token})},false);
-      if(!res.ok)throw new Error(res.error?.message||"Session expired");
+      if(!res.ok)throw new Error(res.error?.message||"انتهت صلاحية الجلسة. يرجى تسجيل الدخول مجدداً.");
       setSession(res.data);
       return session?.access_token||null;
     }catch(e){session=null;save();emit("SIGNED_OUT");return null}
@@ -38,9 +38,9 @@ export function createClient(baseUrl, publishableKey) {
       const response=await fetch(base+path,{...options,headers,signal:ctrl.signal,mode:"cors",cache:"no-store"});
       const txt=await response.text();
       let data=null;try{data=txt?JSON.parse(txt):null}catch(e){data=txt||null}
-      if(!response.ok)return {data:null,error:{message:data?.message||data?.msg||data?.error_description||data?.error||("HTTP "+response.status),status:response.status},ok:false,status:response.status};
+      if(!response.ok)return {data:null,error:{message:data?.message||data?.msg||data?.error_description||data?.error||("خطأ في الاتصال، الرمز: "+response.status),status:response.status},ok:false,status:response.status};
       return {data,error:null,ok:true,status:response.status};
-    }catch(error){return {data:null,error:{message:error.name==="AbortError"?"انتهت مهلة الاتصال بقاعدة البيانات":error.message||"تعذر الاتصال"},ok:false,status:0}}
+    }catch(error){return {data:null,error:{message:error.name==="AbortError"?"انتهت مهلة الاتصال بقاعدة البيانات":error.message||"تعذّر الاتصال بالخادم."},ok:false,status:0}}
     finally{clearTimeout(timeout)}
   };
   const auth={
@@ -92,7 +92,7 @@ export function createClient(baseUrl, publishableKey) {
       const r=await rawFetch("/rest/v1/"+encodeURIComponent(this.table)+(q?"?"+q:""),{method:this.method,headers,body:this.body===undefined?undefined:JSON.stringify(this.body)});
       if(r.error){if(this.maybe&&r.status===406)return {data:null,error:null};return {data:null,error:r.error}}
       const data=this.one?(Array.isArray(r.data)?(r.data[0]||null):r.data):r.data;
-      if(this.one&&!data&&!this.maybe)return {data:null,error:{message:"Row not found"}};
+      if(this.one&&!data&&!this.maybe)return {data:null,error:{message:"لم يتم العثور على السجل."}};
       return {data,error:null};
     }
     then(resolve,reject){return this.execute().then(resolve,reject)}
