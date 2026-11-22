@@ -49,13 +49,19 @@ class FormData{
 const factory=new Function("createClient","document","window","sessionStorage","FormData","crypto","Image",source+
  "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent};");
 const admin=factory(()=>api,document,window,sessionStorage,FormData,{randomUUID:()=>"test-id"},function(){});
-function form(values){
+function form(values,type="productForm"){
  const button={disabled:false};
- return {id:"productForm",values,dataset:{},matches:()=>true,querySelector(s){
-  if(s==='[type="submit"]')return button;
-  if(s==='[name="coverPhoto"]'||s==='[name="photos"]')return {files:[]};
-  return null;
- }};
+ // A real HTML form exposes a nested <input name="id"> as the form.id
+ // named property in some browsers. The handler must use getAttribute.
+ return {
+  id:{name:"id",value:values.id||""},values,dataset:{},
+  getAttribute:(name)=>name==="id"?type:null,
+  matches:()=>true,querySelector(s){
+   if(s==='[type="submit"]')return button;
+   if(s==='[name="coverPhoto"]'||s==='[name="photos"]'||s==='[name="desktop"]'||s==='[name="mobile"]')return {files:[]};
+   return null;
+  }
+ };
 }
 (async()=>{
  await admin.bootPromise;
@@ -77,6 +83,18 @@ function form(values){
  assert.equal(store.products[0].price_iqd,80000,"bad save must never replace valid data");
  assert.equal(node("overlay").hidden,false,"failed editor must remain open");
  assert.equal(node("alert").className,"alert error");
+ // Reproduce the screenshot: editing an existing category with a named id control.
+ // Previously the form was mistaken for an unknown form before any DB request.
+ const category=form({id:"1",table:"categories",name:"الأجهزة الكهربائية",slug:"appliances",parent_id:"",sort_order:"0",active:"true"},"taxonomyForm");
+ await admin.onSubmit({target:category,preventDefault(){},stopPropagation(){}});
+ assert.equal(store.categories[0].name,"الأجهزة الكهربائية","category editing must persist");
+ assert.match(node("alert").textContent,/تم حفظ الفئات/,"category editor must reach the database");
+ assert.equal(node("alert").className,"alert success");
+ // Promo editor also has a hidden id field and must not be rejected.
+ const promo=form({id:"",title:"عرض خاص",subtitle:"خصم",placement:"home",link_url:"#/offers",product_id:"p1",sort_order:"0",active:"true",artwork_only:"true",is_demo:"false"},"promoForm");
+ await admin.onSubmit({target:promo,preventDefault(){},stopPropagation(){}});
+ assert.equal(store.promotions.length,1,"promo must reach the database");
+ assert.match(node("alert").textContent,/تم حفظ الإعلان/);
  const control={dataset:{order:"o1",current:"new"},value:"packing"};
  await admin.saveOrder(control);
  assert.equal(store.orders[0].status,"packing","order status write must persist");
