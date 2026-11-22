@@ -1487,3 +1487,47 @@ html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto!important}
 }
+
+
+/* BAZOO product editor reliability: clear, persistent save feedback */
+.product-save-status{
+ display:block;
+ margin-top:10px;
+ padding:13px 16px;
+ border-radius:12px;
+ border:1px solid transparent;
+ font-size:13px;
+ font-weight:800;
+ line-height:1.8;
+ overflow-wrap:anywhere;
+}
+.product-save-status[hidden]{display:none!important}
+.product-status-error{
+ background:#fff4f4;
+ color:#a12f39;
+ border-color:#f2bdc3;
+}
+.product-status-warning{
+ background:#fffaed;
+ color:#835314;
+ border-color:#f3d79f;
+}
+.product-status-success{
+ background:#f0fbf5;
+ color:#246943;
+ border-color:#c5e8d3;
+}
+.product-save-actions{
+ display:flex;
+ align-items:center;
+ justify-content:flex-start;
+ gap:10px;
+ flex-wrap:wrap;
+ padding:8px 0 2px;
+}
+.product-save-actions .btn{min-height:44px}
+.product-save-actions button:disabled{cursor:wait;opacity:.65}
+@media(max-width:600px){
+ .product-save-actions{flex-direction:column;align-items:stretch}
+ .product-save-actions .btn{width:100%}
+}
