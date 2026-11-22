@@ -672,26 +672,70 @@ body{background:#fbfafc;color:var(--ink)}
 .banner-artwork-link:focus-visible{outline:3px solid #f97316;outline-offset:-5px}
 
 
-/* BAZOO brand treatment: logo floats directly on purple, without a white chip */
-.header .brand,
-.footer .brand{
-  background:transparent!important;
-  background-color:transparent!important;
+/* BAZOO identity ribbon — a white strip joined to the right edge, not a floating card */
+.header .brand{
+  position:relative;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fff!important;
+  background-color:#fff!important;
   border:0!important;
-  border-radius:0!important;
+  border-radius:16px 0 0 16px!important;
   box-shadow:none!important;
-  padding:0!important;
-  overflow:visible!important;
+  overflow:hidden!important;
+  width:269px!important;
+  min-width:269px!important;
+  max-width:269px!important;
+  height:82px!important;
+  padding:7px 24px 7px 20px!important;
+  margin-inline-start:calc(-1 * max(24px, (100vw - 1370px) / 2))!important;
 }
-.header .brand img,
-.footer .brand img{
-  background:none!important;
-  background-color:transparent!important;
-  border:0!important;
-  border-radius:0!important;
-  padding:0!important;
+.header .brand img{
+  display:block;
+  width:100%!important;
+  height:68px!important;
+  max-width:100%!important;
   object-fit:contain!important;
-  filter:drop-shadow(0 1px 3px rgba(255,255,255,.24));
+  object-position:center!important;
+  transform:none!important;
+  filter:none!important;
+  background:transparent!important;
 }
-.header .brand:hover,
-.footer .brand:hover{background:transparent!important}
+.header .brand:hover{background:#fff!important}
+.footer .brand{background:transparent!important;box-shadow:none!important;border:0!important}
+.footer .brand img{object-fit:contain!important}
+@media(max-width:830px){
+  .header .brand{
+    width:220px!important;
+    min-width:220px!important;
+    max-width:220px!important;
+    height:68px!important;
+    padding:6px 18px!important;
+    margin-inline-start:-16px!important;
+    border-radius:14px 0 0 14px!important;
+  }
+  .header .brand img{height:56px!important}
+}
+@media(max-width:600px){
+  .header .brand{
+    width:207px!important;
+    min-width:207px!important;
+    max-width:207px!important;
+    height:58px!important;
+    padding:5px 16px 5px 11px!important;
+    margin-inline-start:-13px!important;
+    border-radius:13px 0 0 13px!important;
+  }
+  .header .brand img{height:48px!important}
+}
+@media(max-width:380px){
+  .header .brand{
+    width:178px!important;
+    min-width:178px!important;
+    max-width:178px!important;
+    padding:4px 12px!important;
+  }
+  .header .brand img{height:44px!important}
+}
