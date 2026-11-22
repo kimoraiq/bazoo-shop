@@ -4,6 +4,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -12,16 +17,32 @@ function createClient(baseUrl, publishableKey) {
   try{const s=JSON.parse(localStorage.getItem(storageKey)||"null");if(s?.access_token&&s?.refresh_token)session=s;}catch(e){}
   const save=()=>{try{session?localStorage.setItem(storageKey,JSON.stringify(session)):localStorage.removeItem(storageKey);}catch(e){}};
   const emit=(event)=>listeners.forEach(fn=>{try{fn(event,session)}catch(e){console.warn("Auth callback error",e)}});
+  // A single refresh request is shared by every concurrent query. Refresh tokens
+  // rotate, so simultaneous refreshes can invalidate an otherwise valid session.
+  let refreshPromise=null;
   const getToken=async()=>{
     if(!session?.access_token)return null;
     const expires=Number(session.expires_at||0);
     if(!expires||expires>Date.now()/1000+60)return session.access_token;
-    try{
-      const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:JSON.stringify({refresh_token:session.refresh_token})},false);
-      if(!res.ok)throw new Error(res.error?.message||"انتهت صلاحية الجلسة. يرجى تسجيل الدخول مجدداً.");
+    if(refreshPromise)return refreshPromise;
+    const previousRefreshToken=session.refresh_token;
+    refreshPromise=(async()=>{
+      const res=await rawFetch("/auth/v1/token?grant_type=refresh_token",{
+        method:"POST",body:JSON.stringify({refresh_token:previousRefreshToken})
+      },false);
+      if(!res.ok){
+        // Connection errors should not erase the login. Only reject a genuinely
+        // revoked/expired refresh token, and never clear a newer session.
+        if([400,401].includes(res.status)&&session?.refresh_token===previousRefreshToken){
+          session=null;save();emit("SIGNED_OUT");
+        }
+        return null;
+      }
+      if(session?.refresh_token!==previousRefreshToken)return session?.access_token||null;
       setSession(res.data,"TOKEN_REFRESHED");
       return session?.access_token||null;
-    }catch(e){session=null;save();emit("SIGNED_OUT");return null}
+    })();
+    try{return await refreshPromise}finally{refreshPromise=null}
   };
   const setSession=(data,event="SIGNED_IN")=>{
     if(!data?.access_token)return;
@@ -122,6 +143,50 @@ function createClient(baseUrl, publishableKey) {
 function createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction}){
 const brandOpts=()=>state.brands.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
 const catOpts=()=>state.categories.filter(x=>x.parent_id).map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
+// Read back every critical admin mutation: never report success from HTTP status alone.
+function sameSavedValue(a,b){
+ if(a===b)return true;
+ if(!a||!b||typeof a!=="object"||typeof b!=="object")return false;
+ if(Array.isArray(a)!==Array.isArray(b))return false;
+ const keys=Object.keys(a);
+ return keys.length===Object.keys(b).length&&keys.every(k=>Object.prototype.hasOwnProperty.call(b,k)&&sameSavedValue(a[k],b[k]));
+}
+async function verifySaved(table,key,id,fields){
+ const {data,error}=await sb.from(table).select("*").eq(key,id).single();
+ if(error||!data)throw Error("لم يتم التحقق من سجل قاعدة البيانات: "+(error?.message||"لا توجد بيانات"));
+ for(const [field,value] of Object.entries(fields||{})){
+  if(!sameSavedValue(data[field],value))throw Error("القيمة المحفوظة تختلف عن التعديل في الحقل: "+field);
+ }
+ return data;
+}
+// Keep unsaved work in this tab, per authenticated admin.
+const DRAFT_PREFIX="bazoo-admin-save-v3:";
+function draftKey(form){return DRAFT_PREFIX+(state.user?.id||"anonymous")+":"+form.id+":"+(form.querySelector('[name="id"]')?.value||"new")}
+function formDraftKey(form){return form.dataset?.draftKey||draftKey(form)}
+function saveDraft(form){
+ try{
+  const values={};
+  form.querySelectorAll("input,select,textarea").forEach(el=>{
+   if(!el.name||["file","hidden","password"].includes(el.type))return;
+   values[el.name]=el.type==="checkbox"?el.checked:el.value;
+  });
+  sessionStorage.setItem(formDraftKey(form),JSON.stringify(values));
+ }catch(e){}
+}
+function watchDraft(form){
+ if(!form)return;
+ if(form.dataset)form.dataset.draftKey=draftKey(form);
+ try{
+  const values=JSON.parse(sessionStorage.getItem(formDraftKey(form))||"null");
+  if(values)form.querySelectorAll("input,select,textarea").forEach(el=>{
+   if(!el.name||["file","hidden","password"].includes(el.type)||!Object.prototype.hasOwnProperty.call(values,el.name))return;
+   if(el.type==="checkbox")el.checked=Boolean(values[el.name]);else el.value=String(values[el.name]);
+  });
+ }catch(e){}
+ form.addEventListener("input",()=>saveDraft(form));
+ form.addEventListener("change",()=>saveDraft(form));
+}
+function clearDraft(form){try{sessionStorage.removeItem(formDraftKey(form))}catch(e){}}
 function calculateDiscount(original,percent){
  const base=Number(original),pct=Number(percent);
  if(!Number.isSafeInteger(base)||base<0||base>2000000000||!Number.isInteger(pct)||pct<0||pct>99)return null;
@@ -420,7 +485,7 @@ if(state.adminTab==="categories"||state.adminTab==="brands"){
 }
 if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" style="margin-bottom:16px"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#plus"></use></svg> إعلان جديد</button><div class="card admin-table"><table><thead><tr><th>الإعلان</th><th>المكان</th><th>الحالة</th><th>تعديل</th></tr></thead><tbody>'+(state.promos.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(p.placement)+'</td><td>'+(p.active?"نشط":"مخفي")+'</td><td><button data-edit-promo="'+p.id+'">تعديل</button><button data-toggle-promo="'+p.id+'">'+(p.active?"إخفاء":"نشر")+'</button><button class="danger-action" data-delete-promo="'+p.id+'">حذف</button></td></tr>').join("")||'<tr><td colspan="4">لا توجد إعلانات</td></tr>')+'</tbody></table></div>';
 if(state.lastAdminSave&&state.adminTab==="products")body='<div class="admin-save-confirmation" role="status">'+esc(state.lastAdminSave)+' <button type="button" data-dismiss-admin-notice aria-label="إغلاق التنبيه">×</button></div>'+body;
-return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
+return '<div class="page"><div id="adminSaveFeedback" role="status" aria-live="polite" class="admin-save-confirmation" '+(state.adminFeedback?"":"hidden")+' >'+esc(state.adminFeedback||"")+'</div><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
 
 async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
@@ -434,6 +499,7 @@ async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
    :sb.from("orders").update({status:nextStatus}).eq("id",orderId).select("id,status").single();
   const {data,error}=await operation;
   if(error||!data||data.status!==nextStatus)throw Error(error?.message||"لم تؤكد قاعدة البيانات تحديث الحالة.");
+   await verifySaved(isLine?"order_items":"orders","id",isLine?itemId:orderId,{status:nextStatus});
   control.dataset.savedStatus=nextStatus;
   state.orderFeedback??={};
   state.orderFeedback[orderId]={error:false,message:(isLine?"تم تحديث حالة المنتج":"تم تحديث حالة الطلب وجميع منتجاته")+" إلى «"+orderStageText(nextStatus)+"» بنجاح."};
@@ -582,6 +648,7 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
  };
  originalInput.addEventListener("input",updateDiscountPreview);
  discountInput.addEventListener("input",updateDiscountPreview);
+ watchDraft(f);
  updateDiscountPreview();
  const mainInput=f.elements.coverPhoto;
  if(mainInput)mainInput.addEventListener("change",()=>{
@@ -603,7 +670,25 @@ if(p)for(const key of ["category_id","brand_id","active","featured","is_demo"]){
  });
 }
 document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{const {data,error}=await sb.from("orders").update({status:el.value}).eq("id",el.dataset.status).select("id,status").single();notify(error||!data?(error?.message||"لم يتم تعديل حالة الطلب. يرجى التحقق من الصلاحيات."):"تم تحديث حالة الطلب.")});
-document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();if(error||!data)return notify(error?.message||"لم تتأكد عملية الحفظ. يرجى التحقق من الصلاحيات.");await loadCatalog();notify("تم تحديث إعدادات التوصيل. ");render()});
+document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{
+ const g=el.dataset.rate;
+ const price=Number(document.getElementById("rate-"+g).value);
+ const enabled=document.getElementById("enabled-"+g).checked;
+ if(!Number.isSafeInteger(price)||price<0)return notify("أدخل سعر توصيل صحيحاً.");
+ if(el.disabled)return;
+ el.disabled=true;
+ try{
+  const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();
+  if(error||!data)throw Error(error?.message||"لم تؤكد قاعدة البيانات التعديل.");
+  const confirmed=await verifySaved("shipping_rates","governorate",g,{price_iqd:price,enabled});
+  await loadCatalog();
+  const existing=state.rates.find(x=>x.governorate===g);
+  if(existing)Object.assign(existing,confirmed);
+  notify("تم حفظ أجور التوصيل لمحافظة "+g+" والتحقق منها.");
+  await render();
+ }catch(err){notify("تعذّر حفظ التوصيل لمحافظة "+g+": "+err.message)}
+ finally{el.disabled=false}
+});
 }
 function setProductSaveStatus(form,message,type="error"){
  const box=form?.querySelector?.("#productSaveStatus");
@@ -638,8 +723,11 @@ async function saveDiscountOnly(form){
    on_sale:priceInfo.percentage>0||promotion
   }).eq("id",id).select("*").single();
   if(error||!data)throw Error(error?.message||"لم يُحفظ التعديل في قاعدة البيانات.");
-  await loadCatalog();
-  setProductSaveStatus(form,"تم حفظ السعر والخصم بنجاح.", "success");
+  await verifySaved("products","id",id,{price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,on_sale:priceInfo.percentage>0||promotion});
+  const refreshed=await loadCatalog();
+  const row=state.products.find(p=>p.id===id);
+  if(row)Object.assign(row,{price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,on_sale:priceInfo.percentage>0||promotion});
+  setProductSaveStatus(form,refreshed?"تم حفظ السعر والخصم بنجاح.":"حُفظ السعر والخصم في قاعدة البيانات، لكن تعذّر تحديث العرض. أعد تحميل الصفحة.",refreshed?"success":"warning");
   state.editProduct=id;
  }catch(err){setProductSaveStatus(form,"تعذّر حفظ الخصم: "+err.message);}
  finally{if(btn)btn.disabled=false}
@@ -686,7 +774,7 @@ async function saveProduct(form){
   const stored=id?await sb.from("products").update(v).eq("id",id).select("*").single()
                  :await sb.from("products").insert(v).select("*").single();
   if(stored.error||!stored.data)throw Error(stored.error?.message||"لم تؤكد قاعدة البيانات حفظ المنتج.");
-  savedRecord=stored.data;
+  savedRecord=await verifySaved("products","id",stored.data.id,v);
   if(form.elements.id)form.elements.id.value=savedRecord.id;
   state.editProduct=savedRecord.id;
   const uploaded=[];
@@ -696,6 +784,7 @@ async function saveProduct(form){
    uploaded.push(coverURL);
    const coverUpdate=await sb.from("products").update({image_url:coverURL}).eq("id",savedRecord.id).select("id,image_url").single();
    if(coverUpdate.error||!coverUpdate.data)throw Error("تم حفظ المنتج، لكن تعذّر تحديث صورته الرئيسية: "+(coverUpdate.error?.message||"تعذّر التأكيد."));
+   savedRecord=await verifySaved("products","id",savedRecord.id,{image_url:coverURL});
   }
   for(let i=0;i<photos.length;i++){
    if(submit)submit.textContent="جارٍ ضغط ورفع الصورة "+(i+1)+" من "+photos.length+"...";
@@ -712,16 +801,19 @@ async function saveProduct(form){
    const result=await sb.from("product_images").insert(rows).select("id");
    if(result.error||!Array.isArray(result.data)||result.data.length!==rows.length)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+(result.error?.message||"لم يُؤكَّد رفع جميع الصور."));
   }
-  await loadCatalog();
+  const refreshed=await loadCatalog();
+  const idx=state.products.findIndex(p=>p.id===savedRecord.id);
+  if(idx>=0)state.products[idx]=savedRecord;else state.products.unshift(savedRecord);
+  clearDraft(form);
   state.editProduct=null;
-  state.lastAdminSave="تم حفظ المنتج «"+name+"» في قاعدة البيانات بنجاح. "+(priceInfo.percentage?"الخصم: "+priceInfo.percentage+"%.":"") ;
+  state.lastAdminSave="تم حفظ المنتج «"+name+"» في قاعدة البيانات بنجاح. "+(refreshed?"":"تعذّر تحديث بعض بيانات العرض؛ أعد تحميل الصفحة. ")+(priceInfo.percentage?"الخصم: "+priceInfo.percentage+"%.":"") ;
   notify(state.lastAdminSave);
   await render();
  }catch(error){
   const saved=!!savedRecord;
   if(saved){
    try{await loadCatalog()}catch(e){}
-   setProductSaveStatus(form,"حُفظ المنتج والسعر والخصم، ولكن حدث خطأ في معالجة الصور: "+error.message,"warning");
+   setProductSaveStatus(form,"وصل ردّ حفظ المنتج من قاعدة البيانات، لكن تعذّر إكمال التحقق أو تجهيز الصور: "+error.message,"warning");
   }else{
    setProductSaveStatus(form,"تعذّر حفظ المنتج: "+error.message);
   }
@@ -748,6 +840,7 @@ function showPromoEditor(id){
   +'<label class="formgroup">نوع الإعلان<select name="is_demo" class="field"><option value="false" '+(!p.is_demo?"selected":"")+'>حقيقي</option><option value="true" '+(p.is_demo?"selected":"")+'>تجريبي</option></select></label></div>'
   +'<button class="btn primary" type="submit">'+icon("upload",17)+' حفظ ونشر الإعلان</button></form>');
  const f=document.querySelector("#adminPromoForm");
+ watchDraft(f);
  for(const type of ["desktop","mobile"]){
   const input=f.elements["photo_"+type];
   input.addEventListener("change",async()=>{
@@ -828,7 +921,12 @@ async function savePromo(form){
   if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة الحاسوب أو اربط الإعلان بمنتج له صورة");return}
   const result=id?await sb.from("promotions").update(v).eq("id",id).select("id").single():await sb.from("promotions").insert(v).select("id").single();
   if(result.error||!result.data)throw Error(result.error?.message||"لم تؤكد قاعدة البيانات حفظ الإعلان.");
-  closeModal();await loadCatalog();notify("تم حفظ الصور الإعلانية للهاتف والحاسوب.");render();
+  const confirmed=await verifySaved("promotions","id",result.data.id,v);
+  clearDraft(form);
+  closeModal();const loaded=await loadCatalog();
+  const idx=state.promos.findIndex(p=>p.id===confirmed.id);
+  if(idx>=0)state.promos[idx]=confirmed;else state.promos.unshift(confirmed);
+  notify(loaded?"تم حفظ الإعلان في قاعدة البيانات.":"تم حفظ الإعلان، لكن تعذّر تحديث بعض بيانات العرض.");render();
  }catch(e){notify("تعذّر حفظ الإعلان: "+e.message)}
  finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر الإعلان"}
 }
@@ -837,6 +935,7 @@ async function toggleRecord(table,id){
  const item=source.find(x=>String(x.id)===String(id));if(!item)return;
  const {data,error}=await sb.from(table).update({active:!item.active}).eq("id",id).select("id,active").single();
  if(error||!data){notify("تعذّر تغيير حالة النشر: "+(error?.message||"لم يتم تحديث السجل. يرجى التحقق من الصلاحيات وتسجيل الدخول."));return}
+ try{await verifySaved(table,"id",id,{active:!item.active})}catch(err){notify("تعذّر التحقق من النشر: "+err.message);return}
  await loadCatalog();notify(item.active?"تم إخفاء العنصر":"تم نشر العنصر");render();
 }
 function removeRecord(table,id,title){
@@ -854,6 +953,7 @@ function showTaxonomyEditor(table,id){
  const obj=rows.find(x=>String(x.id)===String(id))||{};
  const groups=cat?'<label class="formgroup">تابعة لقسم<select class="field" name="parent_id"><option value="">فئة رئيسية</option>'+rows.filter(x=>!x.parent_id&&x.id!==obj.id).map(x=>'<option value="'+x.id+'" '+(String(obj.parent_id)===String(x.id)?"selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label><label class="formgroup">الترتيب<input class="field" type="number" name="sort_order" min="0" max="9999" value="'+esc(obj.sort_order??0)+'"></label>':"";
  openModal(obj.id?"تعديل":"إضافة",'<form class="stack" id="adminTaxonomyForm"><input type="hidden" name="table" value="'+table+'"><input type="hidden" name="id" value="'+esc(obj.id||"")+'"><label class="formgroup">الاسم *<input name="name" class="field" minlength="2" maxlength="100" required value="'+esc(obj.name||"")+'"></label><label class="formgroup">معرّف باللغة الإنجليزية (اختياري)<input name="slug" class="field" pattern="[a-z0-9-]+" value="'+esc(obj.slug||"")+'"></label>'+groups+'<label class="formgroup">الظهور<select class="field" name="active"><option value="true" '+(obj.active!==false?"selected":"")+'>ظاهر</option><option value="false" '+(obj.active===false?"selected":"")+'>مخفي</option></select></label><button type="submit" class="btn primary">'+icon("check",17)+' حفظ</button></form>');
+ watchDraft(document.querySelector("#adminTaxonomyForm"));
 }
 async function saveTaxonomy(form){
  const f=new FormData(form),table=String(f.get("table")),id=f.get("id");
@@ -865,7 +965,14 @@ async function saveTaxonomy(form){
  if(table==="categories"){data.parent_id=f.get("parent_id")?Number(f.get("parent_id")):null;data.sort_order=Number(f.get("sort_order")||0);}
  const result=id?await sb.from(table).update(data).eq("id",id).select("id").single():await sb.from(table).insert(data).select("id").single();
  if(result.error||!result.data){notify("تعذّر الحفظ: "+(result.error?.message||"لم يتم تأكيد حفظ البيانات. يرجى التحقق من الصلاحيات."));return}
- closeModal();await loadCatalog();notify("تم الحفظ وتحديث المتجر");render();
+ let confirmed;
+ try{confirmed=await verifySaved(table,"id",result.data.id,data)}catch(error){notify("تعذّر التحقق من الحفظ: "+error.message);return}
+ clearDraft(form);
+ closeModal();await loadCatalog();
+ const records=table==="categories"?state.categories:state.brands;
+ const index=records.findIndex(x=>x.id===confirmed.id);
+ if(index>=0)records[index]=confirmed;else records.push(confirmed);
+ notify("تم الحفظ والتحقق منه في قاعدة البيانات.");render();
 }
 return {adminPage,bindAdmin,saveProduct,saveDiscountOnly,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
 }
@@ -886,7 +993,17 @@ try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
 function persist(){try{localStorage.setItem("bazoo_cart_v2",JSON.stringify(state.cart));localStorage.setItem("bazoo_favs_v2",JSON.stringify(state.favs))}catch(e){};$("#cartBadge").textContent=Object.values(state.cart).reduce((s,n)=>s+Number(n||0),0)||""}
-function notify(msg){const x=$("#toast");x.textContent=msg;x.classList.add("show");clearTimeout(notify.timer);notify.timer=setTimeout(()=>x.classList.remove("show"),3800)}
+function notify(msg){
+ const message=String(msg||"");
+ if(state.route==="admin"&&/^(تم|تعذّر|لم |حُفظ|خطأ)/.test(message)){
+  state.adminFeedback=message;
+  const panel=$("#adminSaveFeedback");
+  if(panel){panel.hidden=false;panel.textContent=message;panel.classList.toggle("admin-save-failure",/^(تعذّر|لم |خطأ)/.test(message))}
+ }
+ const x=$("#toast");x.textContent=message;x.classList.add("show");
+ clearTimeout(notify.timer);
+ notify.timer=setTimeout(()=>x.classList.remove("show"),5000);
+}
 function openModal(title,html){$("#modalTitle").textContent=title;$("#modalBody").innerHTML=html;$("#modalBody").querySelectorAll("form").forEach(f=>f.noValidate=true);$("#modal").classList.add("show");$("#modalBackdrop").classList.add("show");document.body.style.overflow="hidden"}
 function closeModal(){$("#modal").classList.remove("show");$("#modalBackdrop").classList.remove("show");document.body.style.overflow=""}
 $("#closeModal").onclick=closeModal;$("#modalBackdrop").onclick=closeModal;document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
@@ -1232,7 +1349,9 @@ function renderCategoryNav(){
   +'<button class="category-nav-link" data-go="brands">'+icon("tag",18)+' العلامات التجارية</button><button class="category-nav-link" data-go="offers">'+icon("percent",18)+' العروض</button><button class="category-nav-link nav-admin-entry" data-go="market">'+icon("store",18)+' أضف متجرك</button>';
  root.innerHTML=links;
 }
+let catalogLoadVersion=0;
 async function loadCatalog(){
+ const thisLoad=++catalogLoadVersion;
  const requests=[
   ["categories",()=>sb.from("categories").select("*").order("sort_order")],
   ["brands",()=>sb.from("brands").select("*").order("name")],
@@ -1246,6 +1365,7 @@ async function loadCatalog(){
   if(result.error)throw Error(name+": "+result.error.message);
   return result.data||[];
  }));
+ if(thisLoad!==catalogLoadVersion)return false; // A newer load must never be overwritten by stale responses.
  let failed=false;
  results.forEach((out,i)=>{
   if(out.status==="fulfilled")state[requests[i][0]]=out.value;
@@ -1361,7 +1481,31 @@ document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.
 let searchDebounce;document.addEventListener("input",e=>{
  if(e.target.id==="provinceSearch"){const q=e.target.value.trim();document.querySelectorAll(".province-item").forEach(x=>x.hidden=!x.textContent.includes(q));return}
  if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
-document.addEventListener("submit",async e=>{const id=e.target.id;if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;e.preventDefault();if(!validateSiteForm(e.target))return;if(id==="authForm")await authSubmit(e.target);if(id==="orderForm")await submitOrder(e.target);if(id==="adminProductForm")await saveProduct(e.target);if(id==="adminPromoForm")await savePromo(e.target);if(id==="adminTaxonomyForm")await saveTaxonomy(e.target);if(id==="adminMemberForm")await saveMember(e.target)});
+// Prevent browser navigation for every admin form, even if a later handler errors.
+document.addEventListener("submit",e=>{
+ const id=e.target?.id||"";
+ if(id==="searchForm"||id==="authForm"||id==="orderForm"||id.startsWith("admin"))e.preventDefault();
+},true);
+document.addEventListener("submit",async e=>{
+ const form=e.target,id=form?.id||"";
+ if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}
+ if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;
+ e.preventDefault();
+ if(form.dataset?.saveInProgress==="true")return;
+ if(!validateSiteForm(form))return;
+ if(form.dataset)form.dataset.saveInProgress="true";
+ try{
+  if(id==="authForm")await authSubmit(form);
+  else if(id==="orderForm")await submitOrder(form);
+  else if(id==="adminProductForm")await saveProduct(form);
+  else if(id==="adminPromoForm")await savePromo(form);
+  else if(id==="adminTaxonomyForm")await saveTaxonomy(form);
+  else if(id==="adminMemberForm")await saveMember(form);
+ }catch(error){
+  console.error("BAZOO save error:",error);
+  notify("تعذّر إتمام الحفظ: "+(error?.message||"حدث خطأ غير متوقع."));
+ }finally{if(form.dataset)delete form.dataset.saveInProgress}
+});
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",()=>{if(!pendingScroll)pendingScroll="#app";render()});
