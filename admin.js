@@ -538,8 +538,10 @@ document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{
  try{
   const {data,error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g).select("governorate,price_iqd,enabled").single();
   if(error||!data)throw Error(error?.message||"لم تؤكد قاعدة البيانات التعديل.");
-  await verifySaved("shipping_rates","governorate",g,{price_iqd:price,enabled});
+  const confirmed=await verifySaved("shipping_rates","governorate",g,{price_iqd:price,enabled});
   await loadCatalog();
+  const existing=state.rates.find(x=>x.governorate===g);
+  if(existing)Object.assign(existing,confirmed);
   notify("تم حفظ أجور التوصيل لمحافظة "+g+" والتحقق منها.");
   await render();
  }catch(err){notify("تعذّر حفظ التوصيل لمحافظة "+g+": "+err.message)}
@@ -580,9 +582,10 @@ async function saveDiscountOnly(form){
   }).eq("id",id).select("*").single();
   if(error||!data)throw Error(error?.message||"لم يُحفظ التعديل في قاعدة البيانات.");
   await verifySaved("products","id",id,{price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,on_sale:priceInfo.percentage>0||promotion});
-  await loadCatalog();
-  clearDraft(form);
-  setProductSaveStatus(form,"تم حفظ السعر والخصم بنجاح.", "success");
+  const refreshed=await loadCatalog();
+  const row=state.products.find(p=>p.id===id);
+  if(row)Object.assign(row,{price_iqd:priceInfo.price,compare_at_iqd:priceInfo.percentage>0?priceInfo.original:null,on_sale:priceInfo.percentage>0||promotion});
+  setProductSaveStatus(form,refreshed?"تم حفظ السعر والخصم بنجاح.":"حُفظ السعر والخصم في قاعدة البيانات، لكن تعذّر تحديث العرض. أعد تحميل الصفحة.",refreshed?"success":"warning");
   state.editProduct=id;
  }catch(err){setProductSaveStatus(form,"تعذّر حفظ الخصم: "+err.message);}
  finally{if(btn)btn.disabled=false}
@@ -629,8 +632,7 @@ async function saveProduct(form){
   const stored=id?await sb.from("products").update(v).eq("id",id).select("*").single()
                  :await sb.from("products").insert(v).select("*").single();
   if(stored.error||!stored.data)throw Error(stored.error?.message||"لم تؤكد قاعدة البيانات حفظ المنتج.");
-  savedRecord=stored.data;
-  await verifySaved("products","id",savedRecord.id,v);
+  savedRecord=await verifySaved("products","id",stored.data.id,v);
   if(form.elements.id)form.elements.id.value=savedRecord.id;
   state.editProduct=savedRecord.id;
   const uploaded=[];
@@ -640,7 +642,7 @@ async function saveProduct(form){
    uploaded.push(coverURL);
    const coverUpdate=await sb.from("products").update({image_url:coverURL}).eq("id",savedRecord.id).select("id,image_url").single();
    if(coverUpdate.error||!coverUpdate.data)throw Error("تم حفظ المنتج، لكن تعذّر تحديث صورته الرئيسية: "+(coverUpdate.error?.message||"تعذّر التأكيد."));
-   await verifySaved("products","id",savedRecord.id,{image_url:coverURL});
+   savedRecord=await verifySaved("products","id",savedRecord.id,{image_url:coverURL});
   }
   for(let i=0;i<photos.length;i++){
    if(submit)submit.textContent="جارٍ ضغط ورفع الصورة "+(i+1)+" من "+photos.length+"...";
@@ -657,17 +659,19 @@ async function saveProduct(form){
    const result=await sb.from("product_images").insert(rows).select("id");
    if(result.error||!Array.isArray(result.data)||result.data.length!==rows.length)throw Error("حُفظ المنتج، لكن تعذّر تسجيل الصور في المعرض: "+(result.error?.message||"لم يُؤكَّد رفع جميع الصور."));
   }
-  await loadCatalog();
+  const refreshed=await loadCatalog();
+  const idx=state.products.findIndex(p=>p.id===savedRecord.id);
+  if(idx>=0)state.products[idx]=savedRecord;else state.products.unshift(savedRecord);
   clearDraft(form);
   state.editProduct=null;
-  state.lastAdminSave="تم حفظ المنتج «"+name+"» في قاعدة البيانات بنجاح. "+(priceInfo.percentage?"الخصم: "+priceInfo.percentage+"%.":"") ;
+  state.lastAdminSave="تم حفظ المنتج «"+name+"» في قاعدة البيانات بنجاح. "+(refreshed?"":"تعذّر تحديث بعض بيانات العرض؛ أعد تحميل الصفحة. ")+(priceInfo.percentage?"الخصم: "+priceInfo.percentage+"%.":"") ;
   notify(state.lastAdminSave);
   await render();
  }catch(error){
   const saved=!!savedRecord;
   if(saved){
    try{await loadCatalog()}catch(e){}
-   setProductSaveStatus(form,"حُفظ المنتج والسعر والخصم، ولكن حدث خطأ في معالجة الصور: "+error.message,"warning");
+   setProductSaveStatus(form,"وصل ردّ حفظ المنتج من قاعدة البيانات، لكن تعذّر إكمال التحقق أو تجهيز الصور: "+error.message,"warning");
   }else{
    setProductSaveStatus(form,"تعذّر حفظ المنتج: "+error.message);
   }
@@ -775,9 +779,12 @@ async function savePromo(form){
   if(v.placement==="home"&&!v.desktop_image_url&&!state.products.some(p=>p.id===v.product_id&&p.image_url)){notify("ارفع صورة الحاسوب أو اربط الإعلان بمنتج له صورة");return}
   const result=id?await sb.from("promotions").update(v).eq("id",id).select("id").single():await sb.from("promotions").insert(v).select("id").single();
   if(result.error||!result.data)throw Error(result.error?.message||"لم تؤكد قاعدة البيانات حفظ الإعلان.");
-  await verifySaved("promotions","id",result.data.id,v);
+  const confirmed=await verifySaved("promotions","id",result.data.id,v);
   clearDraft(form);
-  closeModal();await loadCatalog();notify("تم حفظ الصور الإعلانية للهاتف والحاسوب.");render();
+  closeModal();const loaded=await loadCatalog();
+  const idx=state.promos.findIndex(p=>p.id===confirmed.id);
+  if(idx>=0)state.promos[idx]=confirmed;else state.promos.unshift(confirmed);
+  notify(loaded?"تم حفظ الإعلان في قاعدة البيانات.":"تم حفظ الإعلان، لكن تعذّر تحديث بعض بيانات العرض.");render();
  }catch(e){notify("تعذّر حفظ الإعلان: "+e.message)}
  finally{button.disabled=false;button.innerHTML=icon("upload",17)+" حفظ ونشر الإعلان"}
 }
@@ -816,9 +823,14 @@ async function saveTaxonomy(form){
  if(table==="categories"){data.parent_id=f.get("parent_id")?Number(f.get("parent_id")):null;data.sort_order=Number(f.get("sort_order")||0);}
  const result=id?await sb.from(table).update(data).eq("id",id).select("id").single():await sb.from(table).insert(data).select("id").single();
  if(result.error||!result.data){notify("تعذّر الحفظ: "+(result.error?.message||"لم يتم تأكيد حفظ البيانات. يرجى التحقق من الصلاحيات."));return}
- try{await verifySaved(table,"id",result.data.id,data)}catch(error){notify("تعذّر التحقق من الحفظ: "+error.message);return}
+ let confirmed;
+ try{confirmed=await verifySaved(table,"id",result.data.id,data)}catch(error){notify("تعذّر التحقق من الحفظ: "+error.message);return}
  clearDraft(form);
- closeModal();await loadCatalog();notify("تم الحفظ وتحديث المتجر");render();
+ closeModal();await loadCatalog();
+ const records=table==="categories"?state.categories:state.brands;
+ const index=records.findIndex(x=>x.id===confirmed.id);
+ if(index>=0)records[index]=confirmed;else records.push(confirmed);
+ notify("تم الحفظ والتحقق منه في قاعدة البيانات.");render();
 }
 return {adminPage,bindAdmin,saveProduct,saveDiscountOnly,showPromoEditor,savePromo,saveTaxonomy,saveMember,toggleRecord,removeRecord};
 }
