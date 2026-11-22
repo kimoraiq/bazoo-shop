@@ -301,7 +301,72 @@ if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" sty
 if(state.lastAdminSave&&state.adminTab==="products")body='<div class="admin-save-confirmation" role="status">'+esc(state.lastAdminSave)+' <button type="button" data-dismiss-admin-notice aria-label="إغلاق التنبيه">×</button></div>'+body;
 return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
+
+async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
+ const previous=control.dataset.savedStatus||"new";
+ if(nextStatus===previous)return;
+ const isLine=itemId!==null;
+ control.disabled=true;
+ try{
+  const operation=isLine
+   ?sb.from("order_items").update({status:nextStatus}).eq("id",itemId).eq("order_id",orderId).select("id,status").single()
+   :sb.from("orders").update({status:nextStatus}).eq("id",orderId).select("id,status").single();
+  const {data,error}=await operation;
+  if(error||!data||data.status!==nextStatus)throw Error(error?.message||"لم تؤكد قاعدة البيانات تحديث الحالة.");
+  control.dataset.savedStatus=nextStatus;
+  state.orderFeedback??={};
+  state.orderFeedback[orderId]={error:false,message:(isLine?"تم تحديث حالة المنتج":"تم تحديث حالة الطلب وجميع منتجاته")+" إلى «"+orderStageText(nextStatus)+"» بنجاح."};
+  notify(state.orderFeedback[orderId].message);
+  await render();
+  // Stay at the order the manager just updated, rather than jumping to the top.
+  const card=document.getElementById("manage-order-"+orderId);
+  if(card&&card.scrollIntoView)card.scrollIntoView({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?"auto":"smooth",block:"nearest"});
+ }catch(error){
+  control.value=previous;
+  state.orderFeedback??={};
+  state.orderFeedback[orderId]={error:true,message:"تعذّر حفظ الحالة: "+(error.message||"خطأ غير متوقع.")};
+  notify(state.orderFeedback[orderId].message);
+  await render();
+ }finally{control.disabled=false}
+}
+function bindOrderOperations(){
+ document.querySelectorAll("[data-order-status]").forEach(select=>select.onchange=()=>{
+  const id=select.dataset.orderStatus,next=select.value,old=select.dataset.savedStatus;
+  if(next==="cancelled"&&old!=="cancelled"){
+   select.value=old;
+   confirmAction("تأكيد إلغاء الطلب","سيُلغى الطلب بالكامل وتُعاد المنتجات إلى المخزون. لا يمكن إعادة تفعيل الطلب الملغي.",async()=>{
+    await persistOrderStatus(id,"cancelled",select);
+    return false; // replaced below
+   });
+   // The confirmation callback can also keep the dialog open on a rejected edit.
+   return;
+  }
+  persistOrderStatus(id,next,select);
+ });
+ document.querySelectorAll("[data-order-item-status]").forEach(select=>select.onchange=()=>{
+  persistOrderStatus(select.dataset.orderId,select.value,select,select.dataset.orderItemStatus);
+ });
+ document.querySelectorAll("[data-order-filter]").forEach(button=>button.onclick=()=>{
+  state.orderFilter=button.dataset.orderFilter;
+  render();
+ });
+ const search=document.querySelector("#adminOrdersSearch");
+ if(search)search.oninput=()=>{
+  state.orderSearch=search.value;
+  let shown=0;
+  document.querySelectorAll("[data-order-search-card]").forEach(card=>{
+   const matching=(card.dataset.orderSearchText||"").includes(search.value.trim().toLowerCase());
+   card.hidden=!matching;
+   if(matching)shown++;
+  });
+  const empty=document.getElementById("ordersSearchEmpty");
+  if(empty)empty.hidden=shown>0||!search.value.trim();
+ };
+ const refresh=document.getElementById("refreshAdminOrders");
+ if(refresh)refresh.onclick=()=>render();
+}
 function bindAdmin(){
+ bindOrderOperations();
  document.querySelectorAll("[data-dismiss-admin-notice]").forEach(b=>b.onclick=()=>{
   state.lastAdminSave="";render();
  });
