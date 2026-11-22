@@ -1,4 +1,4 @@
-/* BAZOO order management v28: secure status updates, item links and tracking */
+/* BAZOO verified order/status management, independent per-product tracking */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -485,7 +485,7 @@ function bindOrderOperations(){
   const empty=document.getElementById("ordersSearchEmpty");
   if(empty)empty.hidden=shown>0||!search.value.trim();
  };
- const refresh=document.getElementById("refreshAdminOrders");
+ const refresh=document.querySelector("#refreshAdminOrders");
  if(refresh)refresh.onclick=()=>render();
 }
 function bindAdmin(){
