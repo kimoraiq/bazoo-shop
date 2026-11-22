@@ -343,10 +343,10 @@ function bindOrderOperations(){
    // The confirmation callback can also keep the dialog open on a rejected edit.
    return;
   }
-  persistOrderStatus(id,next,select);
+  return persistOrderStatus(id,next,select);
  });
  document.querySelectorAll("[data-order-item-status]").forEach(select=>select.onchange=()=>{
-  persistOrderStatus(select.dataset.orderId,select.value,select,select.dataset.orderItemStatus);
+  return persistOrderStatus(select.dataset.orderId,select.value,select,select.dataset.orderItemStatus);
  });
  document.querySelectorAll("[data-order-filter]").forEach(button=>button.onclick=()=>{
   state.orderFilter=button.dataset.orderFilter;
