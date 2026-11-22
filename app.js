@@ -31,17 +31,29 @@ function confirmAction(title,description,callback){
 }
 function validateSiteForm(form){
  const fields=Array.from(form.querySelectorAll("input,select,textarea"));
+ const fail=(field,message)=>{
+  const box=form.querySelector("#productSaveStatus");
+  if(box){
+   box.hidden=false;
+   box.className="product-save-status fullspan product-status-error";
+   box.textContent=message;
+   box.scrollIntoView?.({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?"auto":"smooth",block:"nearest"});
+  }
+  notify(message);
+  field.focus?.();
+  return false;
+ };
  for(const field of fields){
   if(field.disabled||field.type==="hidden"||field.type==="file")continue;
   const value=String(field.value||"").trim();
   const label=field.closest("label")?.textContent?.trim()?.slice(0,65)||"الحقل";
-  if(field.required&&!value){notify("يرجى تعبئة: "+label);field.focus();return false}
+  if(field.required&&!value)return fail(field,"يرجى تعبئة: "+label);
   if(!value)continue;
-  if(field.type==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)){notify("يرجى كتابة بريد إلكتروني صحيح");field.focus();return false}
-  if(field.minLength>0&&value.length<field.minLength){notify("القيمة قصيرة في: "+label);field.focus();return false}
-  if(field.maxLength>0&&value.length>field.maxLength){notify("القيمة طويلة في: "+label);field.focus();return false}
-  if(field.pattern&&!(new RegExp("^(?:"+field.pattern+")$")).test(value)){notify("صيغة البيانات غير صحيحة في: "+label);field.focus();return false}
-  if(field.type==="number"&&(Number.isNaN(Number(value))||(field.min!==""&&Number(value)<Number(field.min))||(field.max!==""&&Number(value)>Number(field.max)))){notify("أدخل رقماً صحيحاً في: "+label);field.focus();return false}
+  if(field.type==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return fail(field,"يرجى إدخال بريد إلكتروني صحيح.");
+  if(field.minLength>0&&value.length<field.minLength)return fail(field,"القيمة قصيرة في: "+label);
+  if(field.maxLength>0&&value.length>field.maxLength)return fail(field,"القيمة طويلة في: "+label);
+  if(field.pattern&&!(new RegExp("^(?:"+field.pattern+")$")).test(value))return fail(field,"صيغة البيانات غير صحيحة في: "+label);
+  if(field.type==="number"&&(Number.isNaN(Number(value))||(field.min!==""&&Number(value)<Number(field.min))||(field.max!==""&&Number(value)>Number(field.max))))return fail(field,"أدخل رقماً صحيحاً في: "+label);
  }
  return true;
 }
