@@ -26,6 +26,75 @@ function editor(p={}){
  +'<label class="formgroup">عرض خاص<select name="on_sale" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
  +'<button type="submit" class="btn primary fullspan">'+icon("check",18)+' حفظ المنتج وصوره</button></form></div>';
 }
+
+const staffScopes=[
+ ["products","إدارة المنتجات","إضافة وتعديل وحذف المنتجات والصور والمخزون"],
+ ["orders","إدارة الطلبات","عرض طلبات الزبائن وتغيير حالتها"],
+ ["shipping","إعدادات التوصيل","تعديل الأسعار والمحافظات المفعّلة"],
+ ["promos","البنرات والعروض","إدارة الإعلانات والصور الترويجية"],
+ ["categories","إدارة الفئات","إضافة الفئات وتعديلها وإخفاؤها"],
+ ["brands","العلامات التجارية","التحكم بالعلامات داخل المتجر"]
+];
+function canAccess(scope){
+ return state.admin&&(state.adminRole==="owner"||state.adminRole==="full"||state.adminPermissions?.[scope]===true);
+}
+function roleLabel(role){return role==="owner"?"المالك الرئيسي":role==="full"?"أدمن كامل":"أدمن محدود"}
+async function membersPage(){
+ if(state.adminRole!=="owner")return '<div class="notice">إدارة المدراء متاحة للمالك الرئيسي فقط.</div>';
+ const {data,error}=await sb.from("admin_members").select("user_id,email,role,permissions,created_at").order("created_at",{ascending:true});
+ if(error)return '<div class="notice">'+esc("تعذّر تحميل حسابات الإدارة: "+error.message)+'</div>';
+ state.staffMembers=data||[];
+ return '<section class="staff-panel"><div class="staff-panel-head"><div><h2>المدراء والصلاحيات</h2><p>أضف أدمن كامل أو محدود، وحدد شنو يگدر يسوي داخل بازو. الحساب لازم يكون مسجل ومفعّل بالبريد أولاً.</p></div><button type="button" class="btn primary" id="addStaffMember">'+icon("user-plus",18)+' إضافة أدمن</button></div>'
+ +'<div class="staff-cards">'+state.staffMembers.map(member=>{
+    const owner=member.role==="owner";
+    const email=member.email||(owner?state.user.email:"بريد غير مسجل");
+    const granted=member.role==="limited"?staffScopes.filter(([key])=>member.permissions?.[key]===true).map(x=>x[1]):[];
+    return '<article class="staff-card"><div class="staff-card-main"><span class="staff-avatar">'+icon(owner?"shield-check":"user-round",24)+'</span><div class="staff-info"><strong>'+esc(email)+'</strong><span class="staff-role '+(owner?"owner-role":"")+'">'+esc(roleLabel(member.role))+'</span></div></div>'
+    +(member.role==="limited"?'<p class="staff-grants">'+(granted.length?granted.map(x=>'<span>'+esc(x)+'</span>').join(""):"بدون مهام")+'</p>':'<p class="staff-grants">'+(owner?"التحكم الكامل بالمتجر وبحسابات الإدارة":"إدارة كل أقسام المتجر، بدون صلاحية إضافة مدراء")+'</p>')
+    +(!owner?'<div class="staff-actions"><button type="button" class="btn outline" data-staff-edit="'+member.user_id+'">'+icon("settings",16)+' تعديل الصلاحيات</button><button type="button" class="btn danger" data-staff-remove="'+member.user_id+'">'+icon("trash-2",16)+' إزالة الأدمن</button></div>':'<div class="staff-owner-note">'+icon("shield-check",16)+' الحساب محمي ولا يمكن حذفه من هنا</div>')
+    +'</article>';
+ }).join("")+'</div></section>';
+}
+function memberEditor(id){
+ if(state.adminRole!=="owner")return;
+ const member=(state.staffMembers||[]).find(x=>x.user_id===id);
+ if(member?.role==="owner")return notify("لا يمكن تعديل حساب المالك الرئيسي");
+ const role=member?.role||"limited";
+ const scopeChecks=staffScopes.map(([key,name,description])=>'<label class="staff-scope"><input type="checkbox" name="'+key+'" '+(member?.permissions?.[key]===true?"checked":"")+'><span class="staff-scope-title">'+icon("check-circle",17)+' '+name+'</span><small>'+description+'</small></label>').join("");
+ const form='<form id="adminMemberForm" class="staff-editor-form" novalidate>'
+ +'<label class="formgroup">بريد الأدمن المسجّل *<input name="email" type="email" class="field" required value="'+esc(member?.email||"")+'" '+(member?"readonly":"")+' placeholder="name@example.com"></label>'
+ +'<p class="staff-note">لا تطلب كلمة مرور الموظف. خلي الشخص يسجّل حسابه بنفسه ويتأكد من بريده، وبعدها تگدر تعطيه الصلاحية.</p>'
+ +'<label class="formgroup">نوع الحساب<select class="field" name="role" id="staffRoleSelect"><option value="limited" '+(role==="limited"?"selected":"")+'>أدمن محدود</option><option value="full" '+(role==="full"?"selected":"")+'>أدمن كامل</option></select></label>'
+ +'<div id="staffScopeFields" '+(role==="full"?'hidden':'')+'><p class="staff-scopes-title">حدد صلاحيات الأدمن المحدود</p><div class="staff-scopes">'+scopeChecks+'</div></div>'
+ +'<p class="staff-note">الأدمن الكامل يگدر يدير المتجر كله، لكنه ما يگدر يضيف مدراء أو يغيّر صلاحياتهم. هاي الصلاحية محفوظة للمالك فقط.</p>'
+ +'<button type="submit" class="btn primary staff-save">'+icon("check",18)+' '+(member?"حفظ التعديلات":"إضافة الأدمن")+'</button></form>';
+ openModal(member?"تعديل صلاحيات الأدمن":"إضافة أدمن جديد",form);
+ const roleInput=document.querySelector("#staffRoleSelect"),fields=document.querySelector("#staffScopeFields");
+ if(roleInput&&fields)roleInput.onchange=()=>{fields.hidden=roleInput.value==="full"};
+}
+async function saveMember(form){
+ if(state.adminRole!=="owner")return notify("هذه العملية للمالك الرئيسي فقط");
+ const data=new FormData(form),email=String(data.get("email")||"").trim().toLowerCase(),role=String(data.get("role")||"limited");
+ const permissions=Object.fromEntries(staffScopes.map(([key])=>[key,data.has(key)]));
+ if(role==="limited"&&!Object.values(permissions).some(Boolean))return notify("حدد صلاحية واحدة على الأقل للأدمن المحدود");
+ const submit=form.querySelector('button[type="submit"]');submit.disabled=true;
+ try{
+  const {error}=await sb.rpc("admin_grant_member",{p_email:email,p_role:role,p_permissions:permissions});
+  if(error)return notify("تعذّر إضافة الأدمن: "+error.message);
+  closeModal();notify("تم حفظ الحساب والصلاحيات بنجاح");await render();
+ }catch(e){notify("تعذّر حفظ الصلاحيات: "+e.message)}
+ finally{submit.disabled=false}
+}
+async function revokeMember(id){
+ if(state.adminRole!=="owner")return;
+ const member=(state.staffMembers||[]).find(x=>x.user_id===id);
+ if(!member||member.role==="owner")return;
+ confirmAction("إزالة صلاحيات الأدمن","راح يرجع هذا الحساب زبون عادي فوراً. ما راح تنحذف بيانات حسابه أو طلباته.",async()=>{
+  const {error}=await sb.rpc("admin_revoke_member",{p_user_id:id});
+  if(error){notify("تعذّرت إزالة الصلاحية: "+error.message);return false}
+  notify("تمت إزالة صلاحيات الأدمن");await render();return true;
+ });
+}
 async function adminPage(){
 const tabs=[["products","المنتجات"],["orders","الطلبات"],["shipping","التوصيل"],["promos","الإعلانات"],["categories","الفئات"],["brands","العلامات التجارية"]].map(([key,text])=>'<button data-admin-tab="'+key+'" class="'+(state.adminTab===key?"active":"")+'">'+text+'</button>').join("");
 let body="";
