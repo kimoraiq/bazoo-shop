@@ -1,4 +1,4 @@
-/* BAZOO product-save integrity: old images untouched, verified writes */
+/* BAZOO order management v28: secure status updates, item links and tracking */
 /**
  * BAZOO minimal native Supabase HTTP client.
  * Eliminates the third-party JS CDN dependency.
@@ -330,6 +330,76 @@ async function revokeMember(id){
   notify("تمت إزالة صلاحيات المسؤول");await render();return true;
  });
 }
+
+/* BAZOO professional order operations */
+const orderStages=[
+ ["new","جديد"],["confirmed","تم التأكيد"],["packing","قيد التجهيز"],
+ ["shipped","قيد التوصيل"],["delivered","تم التسليم"],["cancelled","ملغي"]
+];
+const orderStageText=status=>orderStages.find(([id])=>id===status)?.[1]||"غير معروف";
+const orderDate=value=>new Date(value).toLocaleString("ar-IQ",{timeZone:"Asia/Baghdad",day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function orderStatusBadge(status,extra=""){
+ return '<span class="order-state-badge state-'+esc(status)+' '+extra+'">'+esc(orderStageText(status))+'</span>';
+}
+function orderStatusChoices(selected,allowCancelled=true){
+ return orderStages.filter(([key])=>allowCancelled||key!=="cancelled").map(([key,title])=>
+  '<option value="'+key+'" '+(key===selected?'selected':'')+'>'+esc(title)+'</option>').join("");
+}
+function orderProductRow(item,order){
+ const product=state.products.find(x=>x.id===item.product_id);
+ const image=product?.image_url&&safeImg(product.image_url)?'<img src="'+safeImg(product.image_url)+'" alt="'+esc(item.product_name)+'" loading="lazy">':icon("package",27);
+ const detail=item.product_id?'<a class="order-product-link" href="#/product/'+encodeURIComponent(item.product_id)+'">'+icon("arrow-up-right",15)+' عرض المنتج</a><button type="button" class="order-copy-link" data-copy-order-product="'+esc(item.product_id)+'" title="نسخ رابط المنتج">'+icon("clipboard",15)+' نسخ الرابط</button>':'<small class="order-product-unavailable">المنتج غير متوفر حالياً</small>';
+ const status=item.status||order.status;
+ return '<article class="order-product-row" data-product-line="'+item.id+'">'
+  +'<div class="order-product-photo">'+image+'</div>'
+  +'<div class="order-product-info"><strong>'+esc(item.product_name)+'</strong><small>الكمية: '+Number(item.quantity)+' × '+money(item.unit_price_iqd)+'</small>'
+  +'<div class="order-product-links">'+detail+'</div></div>'
+  +'<div class="order-item-workflow">'+orderStatusBadge(status,'order-line-badge')
+  +'<label>حالة المنتج<select class="field order-status-select" data-order-item-status="'+item.id+'" data-order-id="'+esc(order.id)+'" data-saved-status="'+esc(status)+'" '+(order.status==="cancelled"?'disabled':'')+'>'
+  +orderStatusChoices(status,false)+(status==="cancelled"?'<option value="cancelled" selected>ملغي</option>':'')+'</select></label>'
+  +'</div></article>';
+}
+function renderAdminOrder(order){
+ const items=Array.isArray(order.order_items)?order.order_items:[];
+ const customer=esc(order.customer_name||"—"),number=esc(String(order.id).slice(0,8).toUpperCase());
+ const totalItems=items.reduce((sum,it)=>sum+Number(it.quantity||0),0);
+ const feedback=state.orderFeedback?.[order.id];
+ return '<article class="order-management-card" id="manage-order-'+esc(order.id)+'" data-order-search-card data-order-search-text="'+esc([order.id,order.customer_name,order.phone,order.governorate,...items.map(x=>x.product_name)].join(" ").toLowerCase())+'">'
+ +'<header class="order-manage-top"><div><span class="order-eyebrow">'+icon("shopping-bag",16)+' طلب رقم '+number+'</span><h3>'+customer+'</h3><p>'+icon("clock",15)+' '+esc(orderDate(order.created_at))+' <span class="order-top-quantity">'+totalItems+' قطعة</span></p></div><div class="order-head-right">'+orderStatusBadge(order.status) +'<strong>'+money(order.total_iqd)+'</strong></div></header>'
+ +'<div class="order-manage-grid">'
+ +'<div class="order-main-pane"><div class="order-block-heading">'+icon("package",19)+' المنتجات المطلوبة <span>'+items.length+'</span></div><div class="order-products">'+items.map(item=>orderProductRow(item,order)).join("")+'</div></div>'
+ +'<aside class="order-customer-pane"><div class="order-block-heading">'+icon("user-round",18)+' معلومات العميل</div>'
+ +'<dl class="order-detail-list"><dt>الاسم</dt><dd>'+customer+'</dd><dt>الهاتف</dt><dd><a href="tel:'+esc(order.phone)+'">'+esc(order.phone)+'</a></dd>'
+ +'<dt>المحافظة</dt><dd>'+esc(order.governorate)+'</dd><dt>العنوان</dt><dd>'+esc(order.address)+'</dd>'
+ +'<dt>الدفع</dt><dd>'+(order.payment_method==="cod"?'الدفع عند الاستلام':'التنسيق عبر واتساب')+'</dd></dl>'
+ +(order.note?'<div class="order-customer-note"><strong>ملاحظات العميل</strong><p>'+esc(order.note)+'</p></div>':'')
+ +'</aside></div>'
+ +'<footer class="order-manage-bottom"><div><strong>إدارة حالة الطلب بالكامل</strong><small>تُحفَظ الحالة تلقائياً، وتُطبَّق على جميع المنتجات. ويمكن بعدها تعديل حالة كل منتج على حدة.</small></div>'
+ +'<div class="order-action-controls"><select class="field order-status-select" data-order-status="'+esc(order.id)+'" data-saved-status="'+esc(order.status)+'" '+(order.status==="cancelled"?'disabled':'')+' aria-label="حالة الطلب">'
+ +orderStatusChoices(order.status)+'</select><span class="order-save-hint">حفظ تلقائي</span></div></footer>'
+ +(feedback?'<div class="order-update-feedback '+(feedback.error?'order-feedback-error':'order-feedback-success')+'" role="status">'+esc(feedback.message)+'</div>':'')
+ +'</article>';
+}
+async function adminOrdersPage(){
+ const {data,error}=await sb.from("orders").select("id,created_at,customer_name,phone,governorate,address,note,payment_method,subtotal_iqd,shipping_iqd,total_iqd,status,order_items(id,product_id,product_name,quantity,unit_price_iqd,line_total_iqd,status)").order("created_at",{ascending:false}).limit(150);
+ if(error)return '<div class="order-alert-error">تعذّر تحميل الطلبات: '+esc(error.message)+'</div>';
+ const orders=data||[];
+ const newCount=orders.filter(o=>o.status==="new"||o.status==="confirmed").length;
+ const packingCount=orders.filter(o=>o.status==="packing").length;
+ const shippedCount=orders.filter(o=>o.status==="shipped").length;
+ const deliveredCount=orders.filter(o=>o.status==="delivered").length;
+ const filter=state.orderFilter||"all";
+ const choices=[["all","جميع الطلبات",orders.length],["new","الجديدة",newCount],["packing","قيد التجهيز",packingCount],["shipped","قيد التوصيل",shippedCount],["delivered","تم التسليم",deliveredCount],["cancelled","الملغاة",orders.filter(o=>o.status==="cancelled").length]];
+ const shown=orders.filter(o=>filter==="all"||(filter==="new"?["new","confirmed"].includes(o.status):o.status===filter));
+ return '<section class="orders-console">'
+ +'<div class="orders-console-hero"><div><span class="orders-console-eyebrow">'+icon("clipboard",16)+' مركز متابعة الطلبات</span><h2>إدارة الطلبات</h2><p>تابع الطلبات، وافتح رابط كل منتج، وحدّث حالته بصورة مستقلة.</p></div><button class="btn outline" id="refreshAdminOrders" type="button">'+icon("refresh",16)+' تحديث الطلبات</button></div>'
+ +'<div class="orders-summary-grid"><div class="orders-summary-box"><small>طلبات جديدة</small><strong>'+newCount+'</strong><span>'+icon("clock",14)+' تنتظر المراجعة</span></div><div class="orders-summary-box"><small>قيد التجهيز</small><strong>'+packingCount+'</strong><span>'+icon("package",14)+' تتم معالجتها</span></div><div class="orders-summary-box"><small>قيد التوصيل</small><strong>'+shippedCount+'</strong><span>'+icon("truck",14)+' في الطريق</span></div><div class="orders-summary-box"><small>مكتملة</small><strong>'+deliveredCount+'</strong><span>'+icon("check-circle",14)+' تم تسليمها</span></div></div>'
+ +'<div class="orders-toolbar"><div class="orders-filter-list">'+choices.map(([key,title,count])=>'<button type="button" data-order-filter="'+key+'" class="'+(filter===key?'active':'')+'">'+title+' <span>'+count+'</span></button>').join("")+'</div>'
+ +'<label class="orders-search-input">'+icon("search",17)+'<input id="adminOrdersSearch" type="search" autocomplete="off" placeholder="ابحث بالرقم أو العميل أو المنتج" aria-label="البحث عن طلب" value="'+esc(state.orderSearch||"")+'"></label></div>'
+ +'<div class="orders-results" id="adminOrdersResults">'+(shown.length?shown.map(renderAdminOrder).join(""):'<div class="orders-empty">'+icon("shopping-bag",28)+'<h3>لا توجد طلبات في هذا القسم</h3><p>يمكنك اختيار حالة أخرى أو تحديث الطلبات.</p></div>')+'<div id="ordersSearchEmpty" class="orders-empty" hidden><h3>لا توجد نتائج للبحث</h3><p>جرّب البحث برقم الطلب أو اسم العميل أو المنتج.</p></div></div>'
+ +'</section>';
+}
+
 async function adminPage(){
 const visibleTabs=[["products","المنتجات"],["orders","الطلبات"],["shipping","التوصيل"],["promos","الإعلانات"],["categories","الفئات"],["brands","العلامات التجارية"]].filter(([key])=>canAccess(key));
 if(state.adminRole==="owner")visibleTabs.push(["members","المسؤولون والصلاحيات"]);
@@ -341,10 +411,7 @@ if(state.adminTab==="products"){
 if(state.editProduct){let p=state.products.find(x=>x.id===state.editProduct)||{};body=editor(p)}
 else body='<button class="btn primary" id="newProduct" style="margin-bottom:16px"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#plus"></use></svg> منتج جديد</button><div class="card admin-table"><table><thead><tr><th>المنتج</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th>تعديل</th></tr></thead><tbody>'+(state.products.map(p=>'<tr><td>'+esc(p.name)+'</td><td><div class="admin-price-cell"><strong>'+money(p.price_iqd)+'</strong>'+(p.compare_at_iqd>p.price_iqd?'<del>'+money(p.compare_at_iqd)+'</del><span class="admin-discount-cell">-'+Math.round((p.compare_at_iqd-p.price_iqd)*100/p.compare_at_iqd)+'%</span>':'')+'</div></td><td>'+p.stock+'</td><td>'+(p.is_demo?"تجريبي / ":"")+(p.active?"منشور":"مخفي")+'</td><td><button data-edit-product="'+p.id+'"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#settings"></use></svg> تعديل</button><button data-toggle-product="'+p.id+'">'+(p.active?"إخفاء":"نشر")+'</button><button class="danger-action" data-delete-product="'+p.id+'">حذف</button></td></tr>').join("")||'<tr><td colspan="5">لا توجد منتجات بعد</td></tr>')+'</tbody></table></div>';
 }
-if(state.adminTab==="orders"){
-const {data,error}=await sb.from("orders").select("id,created_at,customer_name,phone,governorate,address,note,payment_method,total_iqd,status,order_items(product_name,quantity)").order("created_at",{ascending:false}).limit(150);
-body=error?'<p class="error">'+esc(error.message)+'</p>':'<div class="card admin-table"><table><thead><tr><th>الطلب</th><th>العميل</th><th>العنوان</th><th>المنتجات</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>'+((data||[]).map(o=>'<tr><td>'+esc(o.id.slice(0,8))+'<br>'+new Date(o.created_at).toLocaleDateString("ar-IQ")+'</td><td>'+esc(o.customer_name)+'<br>'+esc(o.phone)+'</td><td>'+esc(o.governorate)+'<br>'+esc(o.address)+'<br>'+esc(o.note)+'</td><td>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join("<br>")+'</td><td>'+money(o.total_iqd)+'</td><td><select class="field" data-status="'+o.id+'">'+[["new","جديد"],["confirmed","تم التأكيد"],["packing","تجهيز"],["shipped","قيد التوصيل"],["delivered","مسلّم"],["cancelled","ملغي"]].map(([k,v])=>'<option value="'+k+'" '+(o.status===k?"selected":"")+'>'+v+'</option>').join("")+'</select></td></tr>').join("")||'<tr><td colspan="6">لا توجد طلبات بعد</td></tr>')+'</tbody></table></div>';
-}
+if(state.adminTab==="orders")body=await adminOrdersPage();
 if(state.adminTab==="shipping")body='<div class="card"><p class="subtle">جميع المحافظات غير مفعّلة مبدئياً. حدد رسوم التوصيل الصحيحة ثم فعّل الخدمة.</p><div class="admin-table"><table><thead><tr><th>المحافظة</th><th>التوصيل د.ع</th><th>مفعّل</th><th>حفظ</th></tr></thead><tbody>'+state.rates.map(r=>'<tr><td>'+esc(r.governorate)+'</td><td><input class="field" type="number" min="0" step="1" id="rate-'+esc(r.governorate)+'" value="'+r.price_iqd+'"></td><td><input type="checkbox" id="enabled-'+esc(r.governorate)+'" '+(r.enabled?"checked":"")+'></td><td><button data-rate="'+esc(r.governorate)+'"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#check"></use></svg> حفظ</button></td></tr>').join("")+'</tbody></table></div></div>';
 if(state.adminTab==="categories"||state.adminTab==="brands"){
  const table=state.adminTab,rows=table==="categories"?state.categories:state.brands;
@@ -355,7 +422,74 @@ if(state.adminTab==="promos")body='<button id="newPromo" class="btn primary" sty
 if(state.lastAdminSave&&state.adminTab==="products")body='<div class="admin-save-confirmation" role="status">'+esc(state.lastAdminSave)+' <button type="button" data-dismiss-admin-notice aria-label="إغلاق التنبيه">×</button></div>'+body;
 return '<div class="page"><div class="row"><div><h1>لوحة إدارة BAZOO</h1><p class="admin-role-caption">'+esc(roleLabel(state.adminRole))+'</p></div><button class="btn outline" data-go="home"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#home"></use></svg> المتجر</button></div><div class="adminnav">'+tabs+'</div><div id="adminTabContent" class="admin-tab-content">'+body+'</div></div>';
 }
+
+async function persistOrderStatus(orderId,nextStatus,control,itemId=null){
+ const previous=control.dataset.savedStatus||"new";
+ if(nextStatus===previous)return;
+ const isLine=itemId!==null;
+ control.disabled=true;
+ try{
+  const operation=isLine
+   ?sb.from("order_items").update({status:nextStatus}).eq("id",itemId).eq("order_id",orderId).select("id,status").single()
+   :sb.from("orders").update({status:nextStatus}).eq("id",orderId).select("id,status").single();
+  const {data,error}=await operation;
+  if(error||!data||data.status!==nextStatus)throw Error(error?.message||"لم تؤكد قاعدة البيانات تحديث الحالة.");
+  control.dataset.savedStatus=nextStatus;
+  state.orderFeedback??={};
+  state.orderFeedback[orderId]={error:false,message:(isLine?"تم تحديث حالة المنتج":"تم تحديث حالة الطلب وجميع منتجاته")+" إلى «"+orderStageText(nextStatus)+"» بنجاح."};
+  notify(state.orderFeedback[orderId].message);
+  await render();
+  // Stay at the order the manager just updated, rather than jumping to the top.
+  const card=document.getElementById("manage-order-"+orderId);
+  if(card&&card.scrollIntoView)card.scrollIntoView({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?"auto":"smooth",block:"nearest"});
+  return true;
+ }catch(error){
+  control.value=previous;
+  state.orderFeedback??={};
+  state.orderFeedback[orderId]={error:true,message:"تعذّر حفظ الحالة: "+(error.message||"خطأ غير متوقع.")};
+  notify(state.orderFeedback[orderId].message);
+  await render();
+  return false;
+ }finally{control.disabled=false}
+}
+function bindOrderOperations(){
+ document.querySelectorAll("[data-order-status]").forEach(select=>select.onchange=()=>{
+  const id=select.dataset.orderStatus,next=select.value,old=select.dataset.savedStatus;
+  if(next==="cancelled"&&old!=="cancelled"){
+   select.value=old;
+   confirmAction("تأكيد إلغاء الطلب","سيُلغى الطلب بالكامل وتُعاد المنتجات إلى المخزون. لا يمكن إعادة تفعيل الطلب الملغي.",async()=>{
+    const result=await persistOrderStatus(id,"cancelled",select);
+    return result;
+   });
+   // The confirmation callback can also keep the dialog open on a rejected edit.
+   return;
+  }
+  return persistOrderStatus(id,next,select);
+ });
+ document.querySelectorAll("[data-order-item-status]").forEach(select=>select.onchange=()=>{
+  return persistOrderStatus(select.dataset.orderId,select.value,select,select.dataset.orderItemStatus);
+ });
+ document.querySelectorAll("[data-order-filter]").forEach(button=>button.onclick=()=>{
+  state.orderFilter=button.dataset.orderFilter;
+  render();
+ });
+ const search=document.querySelector("#adminOrdersSearch");
+ if(search)search.oninput=()=>{
+  state.orderSearch=search.value;
+  let shown=0;
+  document.querySelectorAll("[data-order-search-card]").forEach(card=>{
+   const matching=(card.dataset.orderSearchText||"").includes(search.value.trim().toLowerCase());
+   card.hidden=!matching;
+   if(matching)shown++;
+  });
+  const empty=document.getElementById("ordersSearchEmpty");
+  if(empty)empty.hidden=shown>0||!search.value.trim();
+ };
+ const refresh=document.getElementById("refreshAdminOrders");
+ if(refresh)refresh.onclick=()=>render();
+}
 function bindAdmin(){
+ bindOrderOperations();
  document.querySelectorAll("[data-dismiss-admin-notice]").forEach(b=>b.onclick=()=>{
   state.lastAdminSave="";render();
  });
@@ -947,7 +1081,52 @@ function checkout(){if(!cartEntries().length)return cart();if(!state.user){state
 function authView(title="حسابك في بازو"){
  return '<section class="page auth-page"><div class="auth-shell"><div class="auth-form-panel"><a class="auth-back" href="#/home">'+icon("arrow-right",16)+' رجوع للمتجر</a><div class="auth-symbol">'+icon("user-round",29)+'</div><div class="auth-heading"><span class="kicker">BAZOO MEMBERS</span><h1>'+esc(title)+'</h1><p class="subtle">سجّل الدخول لمتابعة طلباتك، أو أنشئ حساباً جديداً خلال لحظات.</p></div><div class="auth-tabs" role="group" aria-label="نوع الدخول"><button type="button" class="active" data-auth-mode="login">'+icon("log-in",18)+' تسجيل الدخول</button><button type="button" data-auth-mode="signup">'+icon("user-plus",18)+' حساب جديد</button></div><form id="authForm" class="stack"><input type="hidden" name="mode" value="login"><label class="formgroup auth-signup-field hidden">الاسم الكامل<span class="input-icon">'+icon("user",19)+'<input type="text" name="full_name" class="field" minlength="2" maxlength="100" autocomplete="name" placeholder="اسمك الكامل"></span></label><label class="formgroup">البريد الإلكتروني<span class="input-icon">'+icon("mail",19)+'<input type="email" name="email" class="field" required autocomplete="email" placeholder="example@email.com" dir="ltr"></span></label><label class="formgroup">كلمة المرور<span class="input-icon auth-password">'+icon("lock",19)+'<input type="password" name="password" class="field" required minlength="6" autocomplete="current-password" placeholder="أدخل كلمة المرور" dir="ltr"><button type="button" class="password-toggle" data-password-toggle="password" aria-label="إظهار كلمة المرور">'+icon("eye",19)+'</button></span></label><label class="formgroup auth-signup-field hidden">تأكيد كلمة المرور<span class="input-icon auth-password">'+icon("shield-check",19)+'<input type="password" name="confirm_password" class="field" minlength="6" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور" dir="ltr"><button type="button" class="password-toggle" data-password-toggle="confirm_password" aria-label="إظهار كلمة المرور">'+icon("eye",19)+'</button></span></label><button type="button" class="forgot-link" id="resetPassword">نسيت كلمة المرور؟</button><button type="submit" class="btn primary auth-submit">'+icon("log-in",19)+' تسجيل الدخول</button></form><p id="authMessage" class="auth-feedback" role="status" aria-live="polite"></p><div class="auth-footnote">'+icon("shield-check",17)+' بيانات حسابك محمية بنظام Supabase Auth</div></div><aside class="auth-art"><div class="auth-art-orbit one"></div><div class="auth-art-orbit two"></div><div class="auth-art-content"><div class="auth-art-logo">'+icon("shopping-bag",52)+'</div><div class="auth-art-kicker">مرحباً بك في BAZOO</div><h2>جميع خياراتك،<br>في مكان واحد.</h2><p>تسوّق بسهولة، واحتفظ بطلباتك، وتابع أحدث المنتجات من بازو.</p><div class="auth-benefit">'+icon("package",20)+' تتبع الطلبات من حسابك</div><div class="auth-benefit">'+icon("shield-check",20)+' تسجيل آمن وسهل</div><div class="auth-benefit">'+icon("shopping-cart",20)+' سلة تسوق محفوظة على جهازك</div></div></aside></div></section>';
 }
-async function account(){if(!state.user)return authView();const {data,error}=await sb.from("orders").select("id,created_at,status,subtotal_iqd,shipping_iqd,total_iqd,governorate,payment_method,order_items(product_name,quantity,unit_price_iqd)").order("created_at",{ascending:false}).limit(60);return '<div class="page"><div class="row"><div><h1>حسابي وطلباتي</h1><p class="user-info">'+esc(state.user.email)+'</p></div><button class="btn outline" id="signOut">تسجيل خروج</button></div><div class="section"><h2>طلباتي</h2>'+(error?'<p class="error">تعذّر تحميل الطلبات.</p>':!(data||[]).length?'<div class="notice">ليست لديك طلبات حتى الآن. يمكنك تصفح المنتجات وطلب ما تحتاج إليه.</div>':data.map(o=>'<div class="order"><div class="row"><div><strong class="orderid">'+esc(o.id.slice(0,8).toUpperCase())+'</strong><p class="subtle">'+new Date(o.created_at).toLocaleDateString("ar-IQ")+' — '+esc(o.governorate)+'</p></div><span class="status">'+esc(label[o.status]||o.status)+'</span></div><p>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join('، ')+'</p><strong class="cost">'+money(o.total_iqd)+'</strong></div>').join(""))+'</div>'+'</div>'}
+
+/* Order history and individual product tracking — customer experience. */
+const trackingSteps=["new","confirmed","packing","shipped","delivered"];
+const orderDateTime=value=>new Date(value).toLocaleString("ar-IQ",{timeZone:"Asia/Baghdad",day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function customerOrderTimeline(status){
+ if(status==="cancelled")return '<div class="tracking-cancelled">'+icon("circle-alert",18)+' تم إلغاء الطلب</div>';
+ const position=trackingSteps.indexOf(status);
+ return '<div class="tracking-steps" aria-label="مراحل متابعة الطلب">'+trackingSteps.map((key,i)=>'<div class="tracking-step '+(i<position?'completed':i===position?'current':'')+'">'
+  +'<span class="tracking-step-dot">'+(i<position?icon("check",13):String(i+1))+'</span><span>'+esc(label[key])+'</span></div>').join("")+'</div>';
+}
+function customerOrderLine(item,order){
+ const product=state.products.find(p=>p.id===item.product_id);
+ const cover=product?.image_url&&safeImg(product.image_url)?'<img src="'+safeImg(product.image_url)+'" alt="'+esc(item.product_name)+'" loading="lazy">':icon("package",27);
+ const link=item.product_id?'<a href="#/product/'+encodeURIComponent(item.product_id)+'" class="order-product-link">'+icon("arrow-up-right",16)+' عرض المنتج</a><button type="button" data-copy-order-product="'+esc(item.product_id)+'" class="order-copy-link">'+icon("clipboard",15)+' نسخ الرابط</button>':'<small class="order-product-unavailable">المنتج غير متوفر حالياً</small>';
+ return '<article class="customer-order-line"><div class="customer-order-cover">'+cover+'</div>'
+ +'<div class="customer-order-line-info"><strong>'+esc(item.product_name)+'</strong>'
+ +'<small>الكمية: '+Number(item.quantity)+' × '+money(item.unit_price_iqd)+'</small>'
+ +'<div class="order-product-links">'+link+'</div></div>'
+ +'<div class="customer-order-line-aside"><span class="order-state-badge state-'+esc(item.status||order.status)+'">'+esc(label[item.status||order.status]||"قيد المتابعة")+'</span>'
+ +'<strong>'+money(Number(item.unit_price_iqd)*Number(item.quantity))+'</strong></div></article>';
+}
+function customerOrderCard(order){
+ const items=Array.isArray(order.order_items)?order.order_items:[];
+ const payment=order.payment_method==="cod"?"الدفع عند الاستلام":"التنسيق عبر واتساب";
+ return '<article class="customer-order-card"><header class="customer-order-top"><div><span>طلب رقم '+esc(String(order.id).slice(0,8).toUpperCase())+'</span>'
+ +'<h3>تفاصيل الطلب</h3><p>'+icon("clock",15)+' '+esc(orderDateTime(order.created_at))+' · '+esc(order.governorate)+'</p></div>'
+ +'<span class="order-state-badge state-'+esc(order.status)+'">'+esc(label[order.status]||"قيد المتابعة")+'</span></header>'
+ +customerOrderTimeline(order.status)
+ +'<div class="customer-order-items-heading">'+icon("package",17)+' المنتجات المطلوبة <span>'+items.length+'</span></div>'
+ +'<div class="customer-order-lines">'+items.map(item=>customerOrderLine(item,order)).join("")+'</div>'
+ +'<footer class="customer-order-footer"><div class="customer-order-receipt"><span>المنتجات <strong>'+money(order.subtotal_iqd)+'</strong></span>'
+ +'<span>التوصيل <strong>'+money(order.shipping_iqd)+'</strong></span><span>طريقة الدفع <strong>'+payment+'</strong></span></div>'
+ +'<div class="customer-order-total"><small>إجمالي الطلب</small><strong>'+money(order.total_iqd)+'</strong></div></footer></article>';
+}
+async function account(){
+ if(!state.user)return authView();
+ const {data,error}=await sb.from("orders").select("id,created_at,status,subtotal_iqd,shipping_iqd,total_iqd,governorate,payment_method,order_items(id,product_id,product_name,quantity,unit_price_iqd,line_total_iqd,status)").order("created_at",{ascending:false}).limit(60);
+ const orders=data||[];
+ return '<div class="page customer-orders-page">'
+ +'<div class="customer-account-head"><div><span class="customer-account-kicker">'+icon("shopping-bag",17)+' حساب بازو</span><h1>طلباتي ومتابعة الشحن</h1>'
+ +'<p class="user-info">'+esc(state.user.email||"")+'</p></div><div class="customer-account-buttons"><button type="button" class="btn outline" id="refreshMyOrders">'+icon("refresh",17)+' تحديث الطلبات</button><button class="btn outline" id="signOut">'+icon("arrow-left",17)+' تسجيل الخروج</button></div></div>'
+ +'<div class="customer-orders-intro"><div>'+icon("truck",22)+'</div><p>تابع كل طلب ومنتجاته خطوة بخطوة. يتم تحديث الحالات من إدارة المتجر، ويمكنك الضغط على «تحديث الطلبات» للاطلاع على آخر التغييرات.</p></div>'
+ +'<div class="customer-orders-list">'+(error?'<div class="orders-empty"><h3>تعذّر تحميل الطلبات</h3><p>'+esc(error.message||"يرجى إعادة المحاولة.")+'</p></div>'
+ :!orders.length?'<div class="orders-empty">'+icon("shopping-bag",34)+'<h3>ليس لديك طلبات بعد</h3><p>اكتشف منتجات بازو وابدأ طلبك الأول.</p><button type="button" class="btn primary" data-go="categories">استكشف المنتجات</button></div>'
+ :orders.map(customerOrderCard).join(""))+'</div></div>';
+}
 
 function productDetailsPage(id){
  const p=state.products.find(x=>x.id===id&&x.active);
@@ -1139,6 +1318,16 @@ async function render(){
 document.addEventListener("click",async e=>{
  const b=e.target.closest('button,[data-detail],a[href^="#/"]');if(!b)return;
  if(b.tagName==="A"&&b.getAttribute("href")?.startsWith("#/")){e.preventDefault();go(decodeURIComponent(b.getAttribute("href").slice(2)));return}
+ if(b.id==="refreshMyOrders"){await render();notify("تم تحديث عرض الطلبات.");return}
+ if(b.dataset.copyOrderProduct){
+  const url=location.origin+location.pathname+"#/product/"+encodeURIComponent(b.dataset.copyOrderProduct);
+  try{
+   if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(url);
+   else{const temp=document.createElement("textarea");temp.value=url;temp.style.position="fixed";temp.style.opacity="0";document.body.append(temp);temp.select();if(!document.execCommand("copy"))throw Error("copy failed");temp.remove();}
+   notify("تم نسخ رابط المنتج.");
+  }catch(e){notify("تعذّر نسخ الرابط؛ يمكنك فتح صفحة المنتج ونسخ عنوانها من المتصفح.");}
+  return;
+ }
  if(b.dataset.provinceContext){openProvincePicker(b.dataset.provinceContext);return}
  if(b.dataset.pickProvince){chooseProvince(b.dataset.pickProvince,b.dataset.provinceTarget);return}
  if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();if(b.dataset.go==="admin"){await refreshAuth();if(!state.admin){notify("يرجى تسجيل الدخول بحساب مسؤول المتجر ثم إعادة المحاولة.");go("account");return}}go(b.dataset.go);return}
