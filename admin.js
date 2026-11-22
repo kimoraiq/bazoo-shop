@@ -364,7 +364,7 @@ function bindOrderOperations(){
   const empty=document.getElementById("ordersSearchEmpty");
   if(empty)empty.hidden=shown>0||!search.value.trim();
  };
- const refresh=document.getElementById("refreshAdminOrders");
+ const refresh=document.querySelector("#refreshAdminOrders");
  if(refresh)refresh.onclick=()=>render();
 }
 function bindAdmin(){
