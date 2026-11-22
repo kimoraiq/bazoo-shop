@@ -5,7 +5,7 @@ const css=fs.readFileSync("admin-panel.css","utf8");
 const js=fs.readFileSync("admin-panel.js","utf8");
 assert.ok(fs.existsSync("بازو افقي.png"),"Original BAZOO horizontal logo is missing");
 assert.ok(fs.existsSync("شعار بازو.png"),"Original BAZOO emblem is missing");
-assert.match(html,/بازو%20%D8%A7%D9%81%D9%82%D9%8A\.png/,"Logo must be the real store logo");
+assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A\.png/,"Logo must be the real store logo");
 assert.match(html,/icons\.svg#shopping-bag/,"Navigation should reuse BAZOO icon library");
 assert.doesNotMatch(html,/brand-symbol|<span class="brand-symbol">B<\/span>/,"Placeholder B logo must be removed");
 assert.match(html,/id="sidebarBackdrop"/,"Mobile drawer requires backdrop");
