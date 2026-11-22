@@ -2,7 +2,29 @@ export function createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,rende
 const brandOpts=()=>state.brands.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
 const catOpts=()=>state.categories.filter(x=>x.parent_id).map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
 function editor(p={}){
-return '<div class="card"><div class="row"><h2>'+ (p.id?"تعديل":"إضافة")+' منتج</h2><button id="cancelEdit" class="btn outline"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#arrow-right"></use></svg> رجوع</button></div><form id="adminProductForm" class="formgrid"><input type="hidden" name="id" value="'+esc(p.id||"")+'"><label class="formgroup fullspan">اسم المنتج *<input name="name" required minlength="2" maxlength="180" class="field" value="'+esc(p.name||"")+'"></label><label class="formgroup">القسم *<select name="category_id" class="field" required><option value="">اختر القسم</option>'+catOpts()+'</select></label><label class="formgroup">العلامة التجارية<select name="brand_id" class="field"><option value="">بدون علامة</option>'+brandOpts()+'</select></label><label class="formgroup">السعر بالدينار *<input type="number" name="price_iqd" min="0" step="1" required class="field" value="'+esc(p.price_iqd??"")+'"></label><label class="formgroup">السعر قبل العرض<input type="number" name="compare_at_iqd" min="0" step="1" class="field" value="'+esc(p.compare_at_iqd??"")+'"></label><label class="formgroup">المخزون *<input type="number" name="stock" min="0" step="1" required class="field" value="'+esc(p.stock??0)+'"></label><label class="formgroup">رمز المنتج SKU<input name="sku" class="field" value="'+esc(p.sku||"")+'"></label><label class="formgroup fullspan">الوصف<textarea name="description" class="field">'+esc(p.description||"")+'</textarea></label><label class="formgroup fullspan">رابط الصورة (HTTPS) أو ارفع صورة<input name="image_url" class="field" value="'+esc(p.image_url||"")+'"></label><label class="formgroup fullspan">صورة JPG / PNG / WEBP — 5MB كحد أقصى<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="field"></label><label class="formgroup">نوع المنتج<select name="is_demo" class="field"><option value="false">منتج حقيقي قابل للطلب</option><option value="true">تجريبي للعرض فقط</option></select></label><label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label><label class="formgroup">مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label><label class="formgroup">عرض<select name="on_sale" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label><button type="submit" class="btn primary fullspan"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#check"></use></svg> حفظ المنتج</button></form></div>';
+ const existing=state.productImages.filter(x=>x.product_id===p.id).sort((a,b)=>a.sort_order-b.sort_order);
+ const specs=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications).map(([a,b])=>a+": "+b).join("\n"):"";
+ const gallery=existing.length?'<div class="admin-gallery-grid">'+existing.map((x,i)=>'<div class="admin-gallery-photo"><img src="'+safeImg(x.image_url)+'" alt="'+esc(x.alt_text||p.name)+'"><div class="admin-gallery-actions"><button type="button" data-admin-cover="'+x.id+'" title="اجعلها الصورة الرئيسية">'+icon("star",15)+'</button><button type="button" data-admin-img-up="'+x.id+'" '+(i===0?"disabled":"")+' title="تقديم الصورة">'+icon("chevron-right",15)+'</button><button type="button" data-admin-img-delete="'+x.id+'" class="danger-action" title="حذف الصورة">'+icon("x",15)+'</button></div>'+(p.image_url===x.image_url?'<small class="cover-label">الرئيسية</small>':'')+'</div>').join("")+'</div>':'<p class="subtle">ماكو صور إضافية بعد. ارفع صور المنتج حتى تظهر بمعرض التفاصيل.</p>';
+ return '<div class="card admin-editor"><div class="row"><div><div class="kicker">إدارة المنتجات</div><h2>'+(p.id?"تعديل المنتج":"منتج جديد")+'</h2></div><button id="cancelEdit" class="btn outline">'+icon("arrow-right",17)+' رجوع</button></div>'
+ +'<form id="adminProductForm" class="formgrid" novalidate><input type="hidden" name="id" value="'+esc(p.id||"")+'">'
+ +'<label class="formgroup fullspan">اسم المنتج *<input name="name" required minlength="2" maxlength="180" class="field" value="'+esc(p.name||"")+'"></label>'
+ +'<label class="formgroup">القسم *<select name="category_id" class="field" required><option value="">اختر القسم</option>'+catOpts()+'</select></label>'
+ +'<label class="formgroup">العلامة التجارية<select name="brand_id" class="field"><option value="">بدون علامة</option>'+brandOpts()+'</select></label>'
+ +'<label class="formgroup">السعر بالدينار *<input type="number" name="price_iqd" min="0" step="1" required class="field" value="'+esc(p.price_iqd??"")+'"></label>'
+ +'<label class="formgroup">السعر السابق<input type="number" name="compare_at_iqd" min="0" step="1" class="field" value="'+esc(p.compare_at_iqd??"")+'"></label>'
+ +'<label class="formgroup">المخزون *<input type="number" name="stock" min="0" step="1" required class="field" value="'+esc(p.stock??0)+'"></label>'
+ +'<label class="formgroup">رمز المنتج SKU<input name="sku" class="field" value="'+esc(p.sku||"")+'"></label>'
+ +'<label class="formgroup fullspan">وصف المنتج<textarea name="description" class="field" rows="4">'+esc(p.description||"")+'</textarea></label>'
+ +'<label class="formgroup fullspan">المواصفات <span class="form-help">كل مواصفة بسطر، مثال: اللون: أسود</span><textarea name="specifications" class="field" rows="4" placeholder="اللون: أسود&#10;الموديل: ...">'+esc(specs)+'</textarea></label>'
+ +'<div class="fullspan image-editor"><div class="image-editor-heading">'+icon("image",22)+' <div><h3>صور المنتج</h3><p>ارفع حتى 8 صور جديدة دفعة وحدة، وتگدر تغيّر الصورة الرئيسية وترتيب الصور.</p></div></div>'
+ +(p.id?gallery:'<p class="subtle">صور المنتج تظهر هنا بعد حفظه أول مرة.</p>')
+ +'<label class="formgroup">رفع صور متعددة JPG / PNG / WEBP — 5MB للصورة<input class="field" type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photoUploadPreview" class="photo-upload-preview"></div>'
+ +'<label class="formgroup">رابط الصورة الرئيسية (اختياري)<input name="image_url" class="field" value="'+esc(p.image_url||"")+'" placeholder="https://..."></label></div>'
+ +'<label class="formgroup">نوع المنتج<select name="is_demo" class="field"><option value="false">منتج قابل للطلب</option><option value="true">نموذج للعرض فقط</option></select></label>'
+ +'<label class="formgroup">النشر<select name="active" class="field"><option value="true">منشور</option><option value="false">مخفي</option></select></label>'
+ +'<label class="formgroup">منتج مميز<select name="featured" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
+ +'<label class="formgroup">عرض خاص<select name="on_sale" class="field"><option value="false">لا</option><option value="true">نعم</option></select></label>'
+ +'<button type="submit" class="btn primary fullspan">'+icon("check",18)+' حفظ المنتج وصوره</button></form></div>';
 }
 async function adminPage(){
 const tabs=[["products","المنتجات"],["orders","الطلبات"],["shipping","التوصيل"],["promos","الإعلانات"],["categories","الفئات"],["brands","العلامات التجارية"]].map(([key,text])=>'<button data-admin-tab="'+key+'" class="'+(state.adminTab===key?"active":"")+'">'+text+'</button>').join("");
@@ -42,17 +64,56 @@ document.querySelectorAll("[data-status]").forEach(el=>el.onchange=async()=>{con
 document.querySelectorAll("[data-rate]").forEach(el=>el.onclick=async()=>{const g=el.dataset.rate;const price=Number(document.getElementById("rate-"+g).value),enabled=document.getElementById("enabled-"+g).checked;if(!Number.isSafeInteger(price)||price<0)return notify("السعر غير صحيح");const {error}=await sb.from("shipping_rates").update({price_iqd:price,enabled}).eq("governorate",g);if(error)return notify(error.message);await loadCatalog();notify("تم تحديث التوصيل ");render()});
 }
 async function saveProduct(form){
-const f=new FormData(form),id=f.get("id");
-const v={name:String(f.get("name")).trim(),category_id:Number(f.get("category_id")),brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,price_iqd:Number(f.get("price_iqd")),compare_at_iqd:f.get("compare_at_iqd")!==""?Number(f.get("compare_at_iqd")):null,stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,description:String(f.get("description")||""),image_url:String(f.get("image_url")||"").trim()||null,active:f.get("active")==="true",featured:f.get("featured")==="true",on_sale:f.get("on_sale")==="true",is_demo:f.get("is_demo")==="true"};
-if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
-if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("الصورة لازم تكون HTTPS");
-try{
-const file=f.get("photo");if(file?.size){if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("الصورة غير مدعومة أو أكبر من 5MB");const ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}[file.type];const filename=crypto.randomUUID()+"."+ext;const {error}=await sb.storage.from("product-images").upload(filename,file,{contentType:file.type});if(error)throw error;v.image_url=sb.storage.from("product-images").getPublicUrl(filename).data.publicUrl}
-const r=id?await sb.from("products").update(v).eq("id",id):await sb.from("products").insert(v);if(r.error)throw r.error;
-await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج ");render();
-}catch(e){notify("فشل حفظ المنتج: "+e.message)}
+ const f=new FormData(form),id=String(f.get("id")||"");
+ const specs={};
+ for(const line of String(f.get("specifications")||"").split("\n")){
+  const i=line.indexOf(":");if(i<1)continue;
+  const key=line.slice(0,i).trim(),value=line.slice(i+1).trim();
+  if(key&&value)specs[key.slice(0,90)]=value.slice(0,300);
+ }
+ const v={name:String(f.get("name")).trim(),category_id:Number(f.get("category_id")),
+  brand_id:f.get("brand_id")?Number(f.get("brand_id")):null,
+  price_iqd:Number(f.get("price_iqd")),compare_at_iqd:f.get("compare_at_iqd")!==""?Number(f.get("compare_at_iqd")):null,
+  stock:Number(f.get("stock")),sku:String(f.get("sku")||"").trim()||null,
+  description:String(f.get("description")||""),specifications:specs,
+  image_url:String(f.get("image_url")||"").trim()||null,
+  active:f.get("active")==="true",featured:f.get("featured")==="true",
+  on_sale:f.get("on_sale")==="true",is_demo:f.get("is_demo")==="true"};
+ if(!v.category_id||!Number.isSafeInteger(v.price_iqd)||!Number.isSafeInteger(v.stock)||v.price_iqd<0||v.stock<0)return notify("تحقق من بيانات المنتج");
+ if(v.image_url&&!/^https:\/\//.test(v.image_url))return notify("رابط الصورة لازم يكون HTTPS");
+ const photos=Array.from(form.elements.photos.files||[]);
+ if(photos.length>8)return notify("حد أقصى 8 صور في كل رفع");
+ const btn=form.querySelector('button[type="submit"]');btn.disabled=true;
+ try{
+  const uploaded=[];
+  for(let i=0;i<photos.length;i++){
+   const file=photos[i];
+   if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("صيغة الصورة غير مدعومة أو حجمها أكبر من 5MB");
+   btn.textContent="جاري رفع صورة "+(i+1)+" من "+photos.length;
+   const ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}[file.type];
+   const path="products/"+crypto.randomUUID()+"."+ext;
+   const res=await sb.storage.from("product-images").upload(path,file,{contentType:file.type});
+   if(res.error)throw Error(res.error.message);
+   uploaded.push(sb.storage.from("product-images").getPublicUrl(path).data.publicUrl);
+  }
+  if(!v.image_url&&uploaded.length)v.image_url=uploaded[0];
+  const saved=id?await sb.from("products").update(v).eq("id",id).select("*").single()
+    :await sb.from("products").insert(v).select("*").single();
+  if(saved.error)throw Error(saved.error.message);
+  const record=saved.data;const gallery=state.productImages.filter(x=>x.product_id===record.id);
+  if(uploaded.length){
+   const maxOrder=gallery.reduce((n,p)=>Math.max(n,p.sort_order),-1);
+   const rows=uploaded.map((url,i)=>({product_id:record.id,image_url:url,alt_text:v.name,sort_order:maxOrder+i+1}));
+   const res=await sb.from("product_images").insert(rows);
+   if(res.error)throw Error("تم حفظ المنتج لكن تعذّر تسجيل بعض الصور: "+res.error.message);
+  }else if(!gallery.length&&v.image_url){
+   const res=await sb.from("product_images").insert({product_id:record.id,image_url:v.image_url,alt_text:v.name,sort_order:0});
+   if(res.error)throw Error(res.error.message);
+  }
+  await loadCatalog();state.editProduct=null;notify("تم حفظ المنتج ومعرض الصور");render();
+ }catch(e){notify("تعذّر الحفظ: "+e.message);await loadCatalog();}
+ finally{btn.disabled=false;btn.innerHTML=icon("check",18)+" حفظ المنتج وصوره";}
 }
-
 function showPromoEditor(id){
  const p=state.promos.find(x=>x.id===id)||{};
  const desk=safeImg(p.desktop_image_url||p.image_url),mobile=safeImg(p.mobile_image_url||p.desktop_image_url||p.image_url);
