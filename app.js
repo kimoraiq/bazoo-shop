@@ -209,7 +209,52 @@ function checkout(){if(!cartEntries().length)return cart();if(!state.user){state
 function authView(title="حسابك في بازو"){
  return '<section class="page auth-page"><div class="auth-shell"><div class="auth-form-panel"><a class="auth-back" href="#/home">'+icon("arrow-right",16)+' رجوع للمتجر</a><div class="auth-symbol">'+icon("user-round",29)+'</div><div class="auth-heading"><span class="kicker">BAZOO MEMBERS</span><h1>'+esc(title)+'</h1><p class="subtle">سجّل الدخول لمتابعة طلباتك، أو أنشئ حساباً جديداً خلال لحظات.</p></div><div class="auth-tabs" role="group" aria-label="نوع الدخول"><button type="button" class="active" data-auth-mode="login">'+icon("log-in",18)+' تسجيل الدخول</button><button type="button" data-auth-mode="signup">'+icon("user-plus",18)+' حساب جديد</button></div><form id="authForm" class="stack"><input type="hidden" name="mode" value="login"><label class="formgroup auth-signup-field hidden">الاسم الكامل<span class="input-icon">'+icon("user",19)+'<input type="text" name="full_name" class="field" minlength="2" maxlength="100" autocomplete="name" placeholder="اسمك الكامل"></span></label><label class="formgroup">البريد الإلكتروني<span class="input-icon">'+icon("mail",19)+'<input type="email" name="email" class="field" required autocomplete="email" placeholder="example@email.com" dir="ltr"></span></label><label class="formgroup">كلمة المرور<span class="input-icon auth-password">'+icon("lock",19)+'<input type="password" name="password" class="field" required minlength="6" autocomplete="current-password" placeholder="أدخل كلمة المرور" dir="ltr"><button type="button" class="password-toggle" data-password-toggle="password" aria-label="إظهار كلمة المرور">'+icon("eye",19)+'</button></span></label><label class="formgroup auth-signup-field hidden">تأكيد كلمة المرور<span class="input-icon auth-password">'+icon("shield-check",19)+'<input type="password" name="confirm_password" class="field" minlength="6" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور" dir="ltr"><button type="button" class="password-toggle" data-password-toggle="confirm_password" aria-label="إظهار كلمة المرور">'+icon("eye",19)+'</button></span></label><button type="button" class="forgot-link" id="resetPassword">نسيت كلمة المرور؟</button><button type="submit" class="btn primary auth-submit">'+icon("log-in",19)+' تسجيل الدخول</button></form><p id="authMessage" class="auth-feedback" role="status" aria-live="polite"></p><div class="auth-footnote">'+icon("shield-check",17)+' بيانات حسابك محمية بنظام Supabase Auth</div></div><aside class="auth-art"><div class="auth-art-orbit one"></div><div class="auth-art-orbit two"></div><div class="auth-art-content"><div class="auth-art-logo">'+icon("shopping-bag",52)+'</div><div class="auth-art-kicker">مرحباً بك في BAZOO</div><h2>جميع خياراتك،<br>في مكان واحد.</h2><p>تسوّق بسهولة، واحتفظ بطلباتك، وتابع أحدث المنتجات من بازو.</p><div class="auth-benefit">'+icon("package",20)+' تتبع الطلبات من حسابك</div><div class="auth-benefit">'+icon("shield-check",20)+' تسجيل آمن وسهل</div><div class="auth-benefit">'+icon("shopping-cart",20)+' سلة تسوق محفوظة على جهازك</div></div></aside></div></section>';
 }
-async function account(){if(!state.user)return authView();const {data,error}=await sb.from("orders").select("id,created_at,status,subtotal_iqd,shipping_iqd,total_iqd,governorate,payment_method,order_items(product_name,quantity,unit_price_iqd)").order("created_at",{ascending:false}).limit(60);return '<div class="page"><div class="row"><div><h1>حسابي وطلباتي</h1><p class="user-info">'+esc(state.user.email)+'</p></div><button class="btn outline" id="signOut">تسجيل خروج</button></div><div class="section"><h2>طلباتي</h2>'+(error?'<p class="error">تعذّر تحميل الطلبات.</p>':!(data||[]).length?'<div class="notice">ليست لديك طلبات حتى الآن. يمكنك تصفح المنتجات وطلب ما تحتاج إليه.</div>':data.map(o=>'<div class="order"><div class="row"><div><strong class="orderid">'+esc(o.id.slice(0,8).toUpperCase())+'</strong><p class="subtle">'+new Date(o.created_at).toLocaleDateString("ar-IQ")+' — '+esc(o.governorate)+'</p></div><span class="status">'+esc(label[o.status]||o.status)+'</span></div><p>'+o.order_items.map(i=>esc(i.product_name)+' × '+i.quantity).join('، ')+'</p><strong class="cost">'+money(o.total_iqd)+'</strong></div>').join(""))+'</div>'+'</div>'}
+
+/* Order history and individual product tracking — customer experience. */
+const trackingSteps=["new","confirmed","packing","shipped","delivered"];
+const orderDateTime=value=>new Date(value).toLocaleString("ar-IQ",{timeZone:"Asia/Baghdad",day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function customerOrderTimeline(status){
+ if(status==="cancelled")return '<div class="tracking-cancelled">'+icon("circle-alert",18)+' تم إلغاء الطلب</div>';
+ const position=trackingSteps.indexOf(status);
+ return '<div class="tracking-steps" aria-label="مراحل متابعة الطلب">'+trackingSteps.map((key,i)=>'<div class="tracking-step '+(i<position?'completed':i===position?'current':'')+'">'
+  +'<span class="tracking-step-dot">'+(i<position?icon("check",13):String(i+1))+'</span><span>'+esc(label[key])+'</span></div>').join("")+'</div>';
+}
+function customerOrderLine(item,order){
+ const product=state.products.find(p=>p.id===item.product_id);
+ const cover=product?.image_url&&safeImg(product.image_url)?'<img src="'+safeImg(product.image_url)+'" alt="'+esc(item.product_name)+'" loading="lazy">':icon("package",27);
+ const link=item.product_id?'<a href="#/product/'+encodeURIComponent(item.product_id)+'" class="order-product-link">'+icon("arrow-up-right",16)+' عرض المنتج</a><button type="button" data-copy-order-product="'+esc(item.product_id)+'" class="order-copy-link">'+icon("clipboard",15)+' نسخ الرابط</button>':'<small class="order-product-unavailable">المنتج غير متوفر حالياً</small>';
+ return '<article class="customer-order-line"><div class="customer-order-cover">'+cover+'</div>'
+ +'<div class="customer-order-line-info"><strong>'+esc(item.product_name)+'</strong>'
+ +'<small>الكمية: '+Number(item.quantity)+' × '+money(item.unit_price_iqd)+'</small>'
+ +'<div class="order-product-links">'+link+'</div></div>'
+ +'<div class="customer-order-line-aside"><span class="order-state-badge state-'+esc(item.status||order.status)+'">'+esc(label[item.status||order.status]||"قيد المتابعة")+'</span>'
+ +'<strong>'+money(Number(item.unit_price_iqd)*Number(item.quantity))+'</strong></div></article>';
+}
+function customerOrderCard(order){
+ const items=Array.isArray(order.order_items)?order.order_items:[];
+ const payment=order.payment_method==="cod"?"الدفع عند الاستلام":"التنسيق عبر واتساب";
+ return '<article class="customer-order-card"><header class="customer-order-top"><div><span>طلب رقم '+esc(String(order.id).slice(0,8).toUpperCase())+'</span>'
+ +'<h3>تفاصيل الطلب</h3><p>'+icon("clock",15)+' '+esc(orderDateTime(order.created_at))+' · '+esc(order.governorate)+'</p></div>'
+ +'<span class="order-state-badge state-'+esc(order.status)+'">'+esc(label[order.status]||"قيد المتابعة")+'</span></header>'
+ +customerOrderTimeline(order.status)
+ +'<div class="customer-order-items-heading">'+icon("package",17)+' المنتجات المطلوبة <span>'+items.length+'</span></div>'
+ +'<div class="customer-order-lines">'+items.map(item=>customerOrderLine(item,order)).join("")+'</div>'
+ +'<footer class="customer-order-footer"><div class="customer-order-receipt"><span>المنتجات <strong>'+money(order.subtotal_iqd)+'</strong></span>'
+ +'<span>التوصيل <strong>'+money(order.shipping_iqd)+'</strong></span><span>طريقة الدفع <strong>'+payment+'</strong></span></div>'
+ +'<div class="customer-order-total"><small>إجمالي الطلب</small><strong>'+money(order.total_iqd)+'</strong></div></footer></article>';
+}
+async function account(){
+ if(!state.user)return authView();
+ const {data,error}=await sb.from("orders").select("id,created_at,status,subtotal_iqd,shipping_iqd,total_iqd,governorate,payment_method,order_items(id,product_id,product_name,quantity,unit_price_iqd,line_total_iqd,status)").order("created_at",{ascending:false}).limit(60);
+ const orders=data||[];
+ return '<div class="page customer-orders-page">'
+ +'<div class="customer-account-head"><div><span class="customer-account-kicker">'+icon("shopping-bag",17)+' حساب بازو</span><h1>طلباتي ومتابعة الشحن</h1>'
+ +'<p class="user-info">'+esc(state.user.email||"")+'</p></div><div class="customer-account-buttons"><button type="button" class="btn outline" id="refreshMyOrders">'+icon("refresh",17)+' تحديث الطلبات</button><button class="btn outline" id="signOut">'+icon("arrow-left",17)+' تسجيل الخروج</button></div></div>'
+ +'<div class="customer-orders-intro"><div>'+icon("truck",22)+'</div><p>تابع كل طلب ومنتجاته خطوة بخطوة. يتم تحديث الحالات من إدارة المتجر، ويمكنك الضغط على «تحديث الطلبات» للاطلاع على آخر التغييرات.</p></div>'
+ +'<div class="customer-orders-list">'+(error?'<div class="orders-empty"><h3>تعذّر تحميل الطلبات</h3><p>'+esc(error.message||"يرجى إعادة المحاولة.")+'</p></div>'
+ :!orders.length?'<div class="orders-empty">'+icon("shopping-bag",34)+'<h3>ليس لديك طلبات بعد</h3><p>اكتشف منتجات بازو وابدأ طلبك الأول.</p><button type="button" class="btn primary" data-go="categories">استكشف المنتجات</button></div>'
+ :orders.map(customerOrderCard).join(""))+'</div></div>';
+}
 
 function productDetailsPage(id){
  const p=state.products.find(x=>x.id===id&&x.active);
@@ -401,6 +446,16 @@ async function render(){
 document.addEventListener("click",async e=>{
  const b=e.target.closest('button,[data-detail],a[href^="#/"]');if(!b)return;
  if(b.tagName==="A"&&b.getAttribute("href")?.startsWith("#/")){e.preventDefault();go(decodeURIComponent(b.getAttribute("href").slice(2)));return}
+ if(b.id==="refreshMyOrders"){await render();notify("تم تحديث عرض الطلبات.");return}
+ if(b.dataset.copyOrderProduct){
+  const url=location.origin+location.pathname+"#/product/"+encodeURIComponent(b.dataset.copyOrderProduct);
+  try{
+   if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(url);
+   else{const temp=document.createElement("textarea");temp.value=url;temp.style.position="fixed";temp.style.opacity="0";document.body.append(temp);temp.select();if(!document.execCommand("copy"))throw Error("copy failed");temp.remove();}
+   notify("تم نسخ رابط المنتج.");
+  }catch(e){notify("تعذّر نسخ الرابط؛ يمكنك فتح صفحة المنتج ونسخ عنوانها من المتصفح.");}
+  return;
+ }
  if(b.dataset.provinceContext){openProvincePicker(b.dataset.provinceContext);return}
  if(b.dataset.pickProvince){chooseProvince(b.dataset.pickProvince,b.dataset.provinceTarget);return}
  if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();if(b.dataset.go==="admin"){await refreshAuth();if(!state.admin){notify("يرجى تسجيل الدخول بحساب مسؤول المتجر ثم إعادة المحاولة.");go("account");return}}go(b.dataset.go);return}
