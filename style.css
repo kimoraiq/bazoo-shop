@@ -2022,3 +2022,43 @@ html{scroll-behavior:smooth}
 @media(max-width:360px){
  .category-results-page .filter-panel.bazoo-catalog-filters{grid-template-columns:1fr!important}
 }
+
+
+/* BAZOO v44 — remaining categories visible on the homepage instead of hidden in admin */
+.bazoo-category-extra-heading{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:10px;margin:22px 2px 16px;padding:16px 2px 0;
+ border-top:1px solid #e9e2f1;
+}
+.bazoo-category-extra-heading h3{
+ margin:0;color:#3f225e;font-size:17px;font-weight:900;line-height:1.5;
+}
+.bazoo-category-extra-heading>span{
+ color:#8f7b9e;font-size:11px;font-weight:700;line-height:1.5
+}
+.bazoo-category-extra-grid{grid-template-rows:auto}
+.bazoo-category-extra-grid .bazoo-category-main .bazoo-category-circle{
+ background:linear-gradient(145deg,#f9f3ff,#f2e9fa);
+ border-color:#d5b6ea;
+}
+.bazoo-category-relation{
+ display:block;max-width:140px;color:#826d99;
+ font-size:10px;line-height:1.4;font-weight:700;text-align:center;
+ white-space:normal;overflow-wrap:anywhere;
+}
+.bazoo-category-extra-grid .bazoo-category-tile{
+ gap:7px;min-height:0
+}
+@media(max-width:980px){
+ .bazoo-category-extra-grid{
+  grid-template-columns:repeat(8,97px);
+  grid-template-rows:auto;
+ }
+}
+@media(max-width:600px){
+ .bazoo-category-extra-heading{margin:16px 2px 12px;padding-top:13px}
+ .bazoo-category-extra-heading h3{font-size:14px}
+ .bazoo-category-extra-heading>span{font-size:10px}
+ .bazoo-category-extra-grid{grid-template-columns:repeat(8,87px)}
+ .bazoo-category-relation{max-width:90px;font-size:9px}
+}
