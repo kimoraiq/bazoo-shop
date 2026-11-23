@@ -100,13 +100,17 @@ function form(values,type="productForm"){
  assert.equal(node("alert").className,"alert success");
  // A parent category and its children must be grouped and each card should expose a direct upload.
  const grouped=admin.renderTaxonomy("categories");
- assert.match(grouped,/صور الفئات والأقسام/,"category view should be easy to find");
+ assert.match(grouped,/صور فئات الصفحة الرئيسية/,"category view should be easy to find");
  assert.match(grouped,/data-parent-category="1"/,"root Appliances category should form a separate group");
  assert.match(grouped,/data-parent-category="3"/,"root Stationery category should form a separate group");
  assert.match(grouped,/data-category-id="2"/,"phone category should have a direct image picker");
  assert.match(grouped,/data-category-id="4"/,"pen category should have a direct image picker");
- assert.match(grouped,/الفئات التي تحتاج صور فقط/,"missing-image filter should be visible");
+ assert.match(grouped,/اعرض الصور الناقصة فقط/,"missing-image filter should be visible");
  assert.match(grouped,/category-photo-input/,"upload button must be directly on each category card");
+ assert.match(grouped,/category-extra-details/,"additional categories must be collapsible");
+ assert.match(grouped,/الفئات الظاهرة في الرئيسية/,"homepage categories section must be distinct");
+ assert.match(grouped,/home-category-admin-grid/,"homepage photo cards must use dedicated grid");
+ assert.ok(grouped.indexOf("home-category-admin-grid")<grouped.indexOf("categoryExtraDetails"),"homepage card grid must precede extra categories");
  assert.ok(grouped.indexOf('data-parent-category="1"')<grouped.indexOf('data-parent-category="3"'));
  // Uploading the phone picture updates only its image URL and verifies its DB value.
  const imageFile={size:4096,type:"image/webp",name:"phones.webp"};
