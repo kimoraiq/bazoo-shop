@@ -242,8 +242,13 @@ function homeCategoryTile(item,position){
 function categoryCircles(){
  const {curated,remaining}=homeCategoryCollection();
  const tiles=[...curated,...remaining].map((item,i)=>homeCategoryTile(item,i)).join("");
- return '<div class="bazoo-category-heading"><div><span class="bazoo-category-kicker">اكتشف منتجاتنا</span><h2>تسوّق حسب الفئة</h2></div><a href="#/categories" class="bazoo-category-all">جميع الفئات '+icon("arrow-left",15)+'</a></div>'+
- '<div class="bazoo-category-scroller" aria-label="جميع أقسام وفئات بازو" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div>';
+ return '<div class="bazoo-category-heading"><div><span class="bazoo-category-kicker">اكتشف منتجاتنا</span><h2>تسوّق حسب الفئة</h2></div>'+
+ '<div class="bazoo-category-heading-actions"><span class="bazoo-category-scroll-hint">اسحب لاستعراض بقية الفئات</span>'+
+ '<div class="bazoo-category-scroll-controls" role="group" aria-label="تحريك الفئات">'+
+ '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="1" aria-label="تحريك الفئات نحو اليمين">'+icon("chevron-right",18)+'</button>'+
+ '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="-1" aria-label="تحريك الفئات نحو اليسار">'+icon("chevron-left",18)+'</button></div>'+
+ '<a href="#/categories" class="bazoo-category-all">جميع الفئات '+icon("arrow-left",15)+'</a></div></div>'+
+ '<div class="bazoo-category-scroller" dir="rtl" aria-label="الفئات في صفين، اسحب يميناً ويساراً لاستعراض المزيد" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div>';
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
@@ -584,6 +589,15 @@ document.addEventListener("click",async e=>{
    state.brand="";state.q="";
   }else if(dest==="categories"){state.section="";state.category="";state.brand="";state.q="";}
   go(dest,dest.startsWith("categories/")?"#categoryResults":"#app");
+  return;
+ }
+ if(b.dataset.categoryScroll){
+  const rail=document.querySelector(".bazoo-category-scroller");
+  if(rail){
+   const step=Math.max(220,Math.round(rail.clientWidth*.72));
+   const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+   rail.scrollBy({left:Number(b.dataset.categoryScroll)*step,behavior:reduced?"auto":"smooth"});
+  }
   return;
  }
  if(b.id==="refreshMyOrders"){await render();notify("تم تحديث عرض الطلبات.");return}
