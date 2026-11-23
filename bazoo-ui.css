@@ -1,0 +1,132 @@
+/* BAZOO shared interactive system — one identity for shop and dashboard */
+.bz-select{
+ display:block;position:relative;width:100%;min-width:0;max-width:100%;
+ box-sizing:border-box;direction:rtl
+}
+.bz-select .bz-native-select{
+ position:absolute!important;width:1px!important;height:1px!important;max-width:1px!important;
+ min-width:0!important;min-height:0!important;padding:0!important;margin:-1px!important;
+ border:0!important;overflow:hidden!important;clip-path:inset(50%)!important;
+ opacity:0!important;pointer-events:none!important;appearance:none!important;
+ background:transparent!important
+}
+.bz-select-trigger{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ box-sizing:border-box;outline:none;width:100%;min-width:0;min-height:49px;max-width:100%;
+ background:#fff;border:1px solid #e5deee;border-radius:12px;
+ color:#2f2046;padding:10px 14px;
+ font:800 13px Tajawal,Arial,sans-serif;line-height:1.45;text-align:right;direction:rtl;
+ cursor:pointer;box-shadow:0 1px 3px #30124d03;
+ transition:border-color .18s,box-shadow .18s,background .18s
+}
+.bz-select-trigger:hover:not(:disabled){border-color:#c8afe8;background:#fcfaff}
+.bz-select-trigger:focus-visible,.bz-is-open .bz-select-trigger{
+ border-color:#8243c7;box-shadow:0 0 0 4px #6f31b517;background:white
+}
+.bz-select-trigger:disabled{color:#aaa0b6;background:#f7f5fa;border-color:#eee9f5;cursor:not-allowed}
+.bz-is-placeholder .bz-select-value{color:#9588a3}
+.bz-select-value{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bz-select-caret{
+ display:inline-block;flex:none;width:9px;height:9px;margin:0 3px 4px 6px;
+ transform:rotate(45deg);border-inline-end:2px solid #806b97;
+ border-bottom:2px solid #806b97;transition:transform .18s
+}
+.bz-is-open .bz-select-caret{transform:rotate(225deg);margin-bottom:-3px}
+.bz-select-popover{
+ position:fixed;z-index:10000;direction:rtl;box-sizing:border-box;
+ display:flex;flex-direction:column;
+ padding:7px;background:#fff;color:#251b38;
+ border:1px solid #e5dcef;border-radius:15px;
+ box-shadow:0 18px 54px rgba(34,13,67,.19),0 5px 13px rgba(34,13,67,.07);
+ overflow:hidden;animation:bzMenuAppear .16s ease-out
+}
+.bz-select-list{overflow:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:thin;scrollbar-color:#d6c6e8 transparent}
+.bz-select-option{
+ width:100%;min-height:40px;display:flex;align-items:center;gap:9px;
+ padding:9px 13px;margin:0;border:0;border-radius:9px;
+ background:transparent;color:#382a4c;
+ font:700 13px Tajawal,Arial,sans-serif;line-height:1.4;
+ text-align:right;direction:rtl;cursor:pointer;
+ transition:background .13s,color .13s
+}
+.bz-select-option:focus-visible,.bz-select-option:hover:not(:disabled){
+ background:#f2eafd;color:#54219d;outline:none
+}
+.bz-select-option.bz-is-selected{
+ background:#eee5fa;color:#5822af;font-weight:900
+}
+.bz-select-option.bz-is-selected::before{
+ content:"✓";display:grid;place-items:center;
+ width:18px;height:18px;flex:0 0 18px;
+ border-radius:6px;background:#5822af;color:#fff;
+ font:900 12px Arial,sans-serif
+}
+.bz-select-option:disabled{opacity:.45;cursor:not-allowed}
+.bz-select-option[hidden]{display:none!important}
+.bz-select-search{position:sticky;top:0;background:#fff;padding:6px 5px 10px;border-bottom:1px solid #f0eaf7;margin-bottom:4px}
+.bz-select-search input{
+ appearance:none;width:100%;box-sizing:border-box;min-height:40px;
+ padding:9px 12px;border:1px solid #e7ddef;border-radius:10px;
+ background:#faf8fd;color:#2e1b45;outline:none;
+ font:700 12px Tajawal,Arial,sans-serif
+}
+.bz-select-search input:focus{border-color:#a174d5;box-shadow:0 0 0 3px #8243c714}
+.bz-select-empty{text-align:center;padding:18px;color:#9689a3;font:700 12px Tajawal,Arial,sans-serif}
+.bz-select-empty[hidden]{display:none!important}
+@keyframes bzMenuAppear{
+ from{opacity:0;transform:translateY(-5px) scale(.99)}
+ to{opacity:1;transform:translateY(0) scale(1)}
+}
+/* Responsive surfaces keep their desktop popover inside the viewport. */
+@media(max-width:600px){
+ .bz-select-trigger{min-height:43px;padding:9px 10px;font-size:11.5px;border-radius:10px}
+ .bz-select-option{min-height:44px;font-size:12px}
+ .bz-select-popover{border-radius:13px;padding:6px}
+}
+@media(prefers-reduced-motion:reduce){
+ .bz-select-popover{animation:none!important}
+ .bz-select-caret,.bz-select-trigger,.bz-select-option{transition:none!important}
+}
+/* Modal and confirmation visual language for storefront, matching the admin dialogs. */
+#modalBackdrop.modal-backdrop{
+ background:rgba(22,9,44,.72);backdrop-filter:blur(8px);
+ -webkit-backdrop-filter:blur(8px)
+}
+#modal.modal{
+ border:1px solid #e7ddf2;border-radius:23px;
+ box-shadow:0 27px 90px #1e113e55;padding:24px;
+ max-width:min(720px,calc(100vw - 25px));background:#fff
+}
+#modal .modal-head{
+ margin:-24px -24px 18px;padding:21px 24px;
+ background:linear-gradient(120deg,#faf7ff,#f3eafc);
+ border-bottom:1px solid #e8dff2;border-radius:22px 22px 0 0
+}
+#modal .modal-head h2{color:#2c1952;font-size:21px;font-weight:900;margin:0}
+#modal .modal-head .close{
+ display:grid;place-items:center;width:38px;height:38px;
+ background:#fff;border:1px solid #e5d6f0;color:#632da6;border-radius:11px
+}
+#modal .modal-head .close:hover{background:#fff1f2;color:#b83253;border-color:#ebc9d0}
+#modal .confirm-shell{background:transparent;border:0;box-shadow:none;text-align:center;padding:5px 0 0}
+#modal .confirm-graphic{
+ display:grid;place-items:center;margin:2px auto 13px;
+ background:#fff0f1;border-radius:18px;color:#c53f57;
+ width:70px;height:70px
+}
+#modal .confirm-actions{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:19px}
+#toast.toast{
+ border-radius:14px;border:1px solid #60408b;
+ padding:14px 22px 14px 18px;
+ background:linear-gradient(105deg,#2b1749,#432273);
+ box-shadow:0 14px 42px rgba(29,10,55,.25);
+ color:#fff;font:800 13px Tajawal,Arial,sans-serif;line-height:1.6
+}
+#toast.toast.bz-success{border-color:#368965;background:linear-gradient(110deg,#194e42,#19684f)}
+#toast.toast.bz-error{border-color:#c45672;background:linear-gradient(110deg,#69263e,#8c2846)}
+@media(max-width:600px){
+ #modal.modal{padding:17px;border-radius:18px}
+ #modal .modal-head{margin:-17px -17px 14px;padding:16px 17px;border-radius:17px 17px 0 0}
+ #modal .modal-head h2{font-size:18px}
+ #toast.toast{font-size:12px}
+}
