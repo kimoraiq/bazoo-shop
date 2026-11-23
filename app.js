@@ -22,6 +22,8 @@ function notify(msg){
   if(panel){panel.hidden=false;panel.textContent=message;panel.classList.toggle("admin-save-failure",/^(تعذّر|لم |خطأ)/.test(message))}
  }
  const x=$("#toast");x.textContent=message;x.classList.add("show");
+ x.classList.toggle("bz-error",/^(تعذّر|خطأ|لم |فشل|يرجى)/.test(message));
+ x.classList.toggle("bz-success",/^(تم |نجح|أُضيف|حُفظ)/.test(message));
  clearTimeout(notify.timer);
  notify.timer=setTimeout(()=>x.classList.remove("show"),5000);
 }
