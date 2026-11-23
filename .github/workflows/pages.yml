@@ -29,6 +29,7 @@ jobs:
           node --check bazoo-ui.js
           node bazoo-ui-test.cjs
           node admin-panel-test.cjs
+          node demo-preview-safety-test.cjs
           node category-hierarchy-test.cjs
           node category-admin-consistency-test.cjs
           node catalog-dependent-filters-test.cjs
