@@ -39,6 +39,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1543,6 +1548,9 @@ async function render(){
    state.section=root?String(root.id):"";
    state.category=selected.parent_id?String(selected.id):"";
   }else{state.section="";state.category="";}
+ }else if(route==="categories"){
+  // Returning to the unfiltered catalog (including browser Back) clears stale section/child choices.
+  state.section="";state.category="";
  }
  if(route==="admin"){window.location.replace("./admin.html");return;}
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
