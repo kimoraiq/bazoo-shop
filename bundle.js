@@ -24,6 +24,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1003,7 +1008,7 @@ const icon=(name,size=20,cls="")=>'<svg class="svg-icon '+cls+'" width="'+size+'
 const placeholder='<div class="placeholder"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#image"></use></svg></div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",category:"",brand:"",q:"",promoIndex:0,homeCategoryGroup:"featured",homeCategoriesExpanded:false,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
+const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",category:"",brand:"",q:"",promoIndex:0,homeCategoryGroup:"electronics",homeCategoriesExpanded:false,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -1183,12 +1188,12 @@ function drawHero(){
 }
 function categoryPhoto(c){
  const src=safeImg(c.image_url);
- if(src)return '<img class="category-thumb" src="'+src+'" alt="'+esc(c.name)+'" loading="lazy" decoding="async">';
- // Reuse a real photo already uploaded for a product in the selected category.
+ if(src)return '<img class="category-thumb" src="'+src+'" alt="'+esc(c.name)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer">';
+ // For new categories, reuse actual product photographs until an admin uploads a dedicated cover.
  const ids=c.id?descendantIds(c.id):null;
  const product=ids?activeProducts().find(p=>ids.has(String(p.category_id))&&safeImg(p.image_url)):null;
  if(product)return '<img class="category-thumb" src="'+safeImg(product.image_url)+'" alt="'+esc(c.name)+'" loading="lazy" decoding="async">';
- return '<span class="category-emoji" aria-hidden="true">'+(slugEmoji[c.slug]||"🛍️")+'</span>';
+ return '<span class="category-image-missing" aria-label="لا توجد صورة لهذا التصنيف">'+icon("image",22)+'</span>';
 }
 function activeCategoriesOnHome(){
  const list=state.categories.filter(c=>c.active&&c.parent_id&&c.show_on_home!==false&&categoryChain(c.id).every(x=>x.active));
@@ -1197,31 +1202,34 @@ function activeCategoriesOnHome(){
  return [...group("electronics").sort(order),...group("appliances").sort(order),...group("stationery").sort(order),
  ...list.filter(c=>!["electronics","appliances","stationery"].some(slug=>categoryChain(c.id).some(p=>p.slug===slug))).sort(order)];
 }
-// Compact curated category explorer: only six cards initially, grouped by parent.
-const homeCategoryTabs=[
- {key:"featured",name:"المختارة",icon:"sparkles"},
- {key:"electronics",name:"إلكترونيات",icon:"smartphone"},
- {key:"appliances",name:"أجهزة كهربائية",icon:"plug"},
- {key:"stationery",name:"قرطاسية",icon:"book-open"}
-];
-const featuredCategorySlugs=["phones","laptops","smart-watches","screens","refrigerators","air-conditioners"];
+// Parent category tabs are generated from the database (not a hard-coded shortlist).
+// The products and category IDs remain linked by category.parent_id in Supabase.
 function categoryCircles(){
- const all=state.categories.length?activeCategoriesOnHome():homeCategoryDefaults.map(c=>({...c,id:null}));
- const tabs=homeCategoryTabs.filter(t=>t.key==="featured"||all.some(c=>c.id&&categoryChain(c.id).some(p=>p.slug===t.key)));
- const active=tabs.some(t=>t.key===state.homeCategoryGroup)?state.homeCategoryGroup:"featured";
- const categoryGroup=active==="featured"?all:all.filter(c=>c.id&&categoryChain(c.id).some(p=>p.slug===active));
- let ordered=categoryGroup;
- if(active==="featured"){
-  const selected=featuredCategorySlugs.map(slug=>all.find(c=>c.slug===slug)).filter(Boolean);
-  ordered=[...selected,...all.filter(c=>!selected.includes(c))];
- }
- const shown=state.homeCategoriesExpanded?ordered:ordered.slice(0,6);
- const tabsHtml=tabs.map(t=>'<button type="button" class="bazoo-cat-tab '+(active===t.key?"is-active":"")+'" data-home-category-group="'+t.key+'" aria-pressed="'+(active===t.key?"true":"false")+'">'+icon(t.icon,15)+'<span>'+t.name+'</span></button>').join("");
- const tiles=shown.map(c=>'<a class="bazoo-cat-tile" href="'+(c.id?'#/categories/'+encodeURIComponent(c.id):'#/categories')+'" '+(c.id?'data-category-id="'+c.id+'"':'')+' aria-label="عرض منتجات '+esc(c.name)+'"><span class="bazoo-cat-art">'+categoryPhoto(c)+'</span><span class="bazoo-cat-copy"><strong>'+esc(c.name)+'</strong><small>استكشف المنتجات</small></span>'+icon("chevron-left",15,"bazoo-cat-arrow")+'</a>').join("");
- return '<div class="bazoo-cat-heading"><div><span class="bazoo-cat-kicker">اكتشف عالم بازو</span><h2>تسوّق حسب الفئة</h2><p>اختر القسم الذي يناسبك، وابدأ التسوّق مباشرةً.</p></div><a href="#/categories" class="bazoo-cat-catalog-link">جميع المنتجات '+icon("arrow-left",16)+'</a></div>'+
- '<div class="bazoo-cat-tabs" role="group" aria-label="تصفية الفئات حسب القسم">'+tabsHtml+'</div>'+
- '<div class="bazoo-cat-grid" role="navigation" aria-label="التصنيفات المتاحة">'+tiles+'</div>'+
- (ordered.length>6?'<div class="bazoo-cat-foot"><button type="button" class="bazoo-cat-more" data-home-category-more="1" aria-expanded="'+(state.homeCategoriesExpanded?"true":"false")+'">'+(state.homeCategoriesExpanded?"عرض فئات أقل":"عرض بقية الفئات")+' '+icon(state.homeCategoriesExpanded?"chevron-up":"chevron-down",15)+'</button><span>'+shown.length+' من '+ordered.length+' فئة</span></div>':"");
+ const all=state.categories.length?activeCategoriesOnHome():[];
+ const roots=state.categories.filter(c=>c.active&&!c.parent_id&&all.some(child=>categoryChain(child.id).some(a=>String(a.id)===String(c.id))));
+ const recommended=["electronics","appliances","stationery"];
+ roots.sort((a,b)=>{
+  const ai=recommended.indexOf(a.slug),bi=recommended.indexOf(b.slug);
+  return (ai<0?100:ai)-(bi<0?100:bi)||Number(a.sort_order||0)-Number(b.sort_order||0);
+ });
+ if(!roots.length)return '<div class="bazoo-cat-empty">تُعرض الفئات هنا بمجرد إضافتها من لوحة إدارة المتجر.</div>';
+ const current=roots.find(c=>c.slug===state.homeCategoryGroup)||roots[0];
+ const children=all.filter(c=>categoryChain(c.id).some(parent=>String(parent.id)===String(current.id)));
+ children.sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar"));
+ const shown=state.homeCategoriesExpanded?children:children.slice(0,6);
+ const tabs=roots.map(root=>{
+  const count=all.filter(c=>categoryChain(c.id).some(parent=>String(parent.id)===String(root.id))).length;
+  return '<button type="button" class="bazoo-cat-tab '+(current.id===root.id?'is-active':'')+'" data-home-category-group="'+esc(root.slug)+'" aria-pressed="'+(current.id===root.id?'true':'false')+'"><span>'+esc(root.name)+'</span><small>'+count+'</small></button>';
+ }).join("");
+ const cards=shown.map(c=>
+  '<a class="bazoo-cat-tile" href="#/categories/'+encodeURIComponent(c.id)+'" data-category-id="'+c.id+'" aria-label="عرض منتجات '+esc(c.name)+'">'+
+  '<span class="bazoo-cat-photo">'+categoryPhoto(c)+'</span><strong class="bazoo-cat-name">'+esc(c.name)+'</strong></a>'
+ ).join("");
+ return '<div class="bazoo-cat-heading"><div><span class="bazoo-cat-kicker">أقسام بازو</span><h2>تسوّق حسب الفئة</h2><p>اختر القسم، ثم الفئة المناسبة لتنتقل إلى منتجاتها مباشرة.</p></div></div>'+
+ '<div class="bazoo-cat-tabs" role="group" aria-label="الأقسام الرئيسية">'+tabs+'</div>'+
+ '<div class="bazoo-cat-subheading"><strong>فئات '+esc(current.name)+'</strong><a href="#/categories/'+encodeURIComponent(current.id)+'">عرض منتجات القسم '+icon("arrow-left",14)+'</a></div>'+
+ '<div class="bazoo-cat-grid" role="navigation" aria-label="الفئات التابعة لقسم '+esc(current.name)+'">'+cards+'</div>'+
+ (children.length>6?'<div class="bazoo-cat-foot"><button type="button" class="bazoo-cat-more" data-home-category-more="1" aria-expanded="'+(state.homeCategoriesExpanded?'true':'false')+'">'+(state.homeCategoriesExpanded?'عرض أقل':'عرض جميع فئات '+esc(current.name))+' '+icon(state.homeCategoriesExpanded?'chevron-up':'chevron-down',15)+'</button></div>':"");
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
