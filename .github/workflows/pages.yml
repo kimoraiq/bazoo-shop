@@ -26,6 +26,8 @@ jobs:
           node --check client.js
           node --check bundle.js
           node --check admin-panel.js
+          node --check bazoo-ui.js
+          node bazoo-ui-test.cjs
           node admin-panel-test.cjs
           node category-hierarchy-test.cjs
           node catalog-dependent-filters-test.cjs
