@@ -44,7 +44,7 @@ assert.doesNotMatch(carouselStyles,/grid-template-columns:repeat\([345678],minma
 assert.match(app,/class="bazoo-category-scroll-controls"/,"desktop needs visible navigation arrows");
 assert.match(app,/data-category-scroll="1"/,"right arrow is missing");
 assert.match(app,/data-category-scroll="-1"/,"left arrow is missing");
-assert.match(app,/rail\.scrollBy\(\{left:Number\(b\.dataset\.categoryScroll\)\*step/,"arrow buttons must scroll the gallery");
+assert.match(app,/rail\.scrollBy\(\{left:Number\(b\.dataset\.categoryScroll\)\*categoryCarouselStep\(rail\)/,"arrow buttons must scroll the gallery");
 assert.match(app,/class="bazoo-category-scroller" dir="rtl"/,"category scroll direction must match the Arabic RTL layout");
 assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatment missing");
 assert.match(html,/style\.css\?v=20261123carousel52/,"stylesheet cache must be refreshed");
