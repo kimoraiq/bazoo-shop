@@ -230,12 +230,18 @@ function categoryCard(category,rows,isRoot=false){
  '</div></article>';
 }
 function homepageCategoryRecords(rows){
- return HOME_CATEGORY_ORDER.map((slug,position)=>{
-  if(slug==="offers")return {slug,position,isOffer:true,name:"العروض المميزة"};
-  const row=rows.find(category=>category.slug===slug);
-  if(!row||!row.active||row.show_on_home===false||categoryAncestors(row,rows).some(parent=>!parent.active))return null;
-  return {...row,position,isOffer:false};
- }).filter(Boolean);
+ const active=rows.filter(row=>row.active&&row.show_on_home!==false&&categoryAncestors(row,rows).every(parent=>parent.active));
+ const bySlug=new Map(active.map(row=>[row.slug,row]));
+ const curated=HOME_CATEGORY_ORDER.map(slug=>slug==="offers"?{slug,name:"العروض المميزة",isOffer:true}:bySlug.get(slug)).filter(Boolean);
+ const pinned=new Set(HOME_CATEGORY_ORDER);
+ const extras=active.filter(row=>!pinned.has(row.slug)).sort((a,b)=>{
+  const aRoot=!a.parent_id,bRoot=!b.parent_id;
+  if(aRoot!==bRoot)return aRoot?-1:1;
+  const ap=categoryAncestors(a,rows).map(x=>x.name).join(" / ");
+  const bp=categoryAncestors(b,rows).map(x=>x.name).join(" / ");
+  return ap.localeCompare(bp,"ar")||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar");
+ });
+ return [...curated,...extras].map((row,position)=>({...row,position}));
 }
 function homepageCategoryCard(item,rows){
  if(item.isOffer)return '<article class="home-category-admin-card offer-category-admin" data-home-position="'+item.position+'">'+
@@ -265,8 +271,7 @@ function categoryManagerGroups(){
  const missingOnly=state.categoryMissingOnly;
  let count=0;
  const groups=roots.map(root=>{
-  const shownIds=new Set(homepageCategoryRecords(rows).filter(x=>!x.isOffer).map(x=>String(x.id)));
-  const descendants=rows.filter(c=>String(c.id)!==String(root.id)&&!shownIds.has(String(c.id))&&categoryAncestors(c,rows).some(x=>String(x.id)===String(root.id)));
+  const descendants=rows.filter(c=>String(c.id)!==String(root.id)&&categoryAncestors(c,rows).some(x=>String(x.id)===String(root.id)));
   descendants.sort((a,b)=>categorySortValue(a,rows).localeCompare(categorySortValue(b,rows),"ar"));
   const rootMatches=!query||[root.name,root.slug].some(v=>String(v||"").toLocaleLowerCase("ar").includes(query));
   const matched=descendants.filter(c=>
@@ -301,18 +306,18 @@ function renderTaxonomy(tableName){
  }
  const rows=state.records.categories||[];
  const featured=homepageCategoryRecords(rows);
- const featuredIds=new Set(featured.filter(x=>!x.isOffer).map(x=>String(x.id)));
- const extraCount=rows.filter(x=>!featuredIds.has(String(x.id))).length;
+ const homeCount=featured.filter(x=>!x.isOffer).length;
+ const roots=rows.filter(x=>!x.parent_id).length;
  const missing=featured.filter(x=>!x.isOffer&&!x.image_url).length;
  return '<div class="category-manager category-manager-v2">'+
  '<div class="category-manager-intro"><div><h2>صور فئات الصفحة الرئيسية</h2>'+
  '<p>نفس العناصر ونفس ترتيب المتجر. صورة كل فئة تنرفع من بطاقتها مباشرة، بدون اختلاط بالأقسام الأخرى.</p></div>'+
  '<button type="button" class="button" data-action="new" data-table="categories">'+glyph("plus")+'إضافة قسم أو فئة</button></div>'+
  '<div class="category-manager-stats"><span>'+glyph("image")+featured.length+' عنصراً بالرئيسية</span>'+
- '<span>'+glyph("grid")+extraCount+' أقسام وفئات أخرى</span>'+
+ '<span>'+glyph("grid")+rows.length+' قسم وفئة بقاعدة البيانات</span>'+
  '<span class="'+(missing?"needs-photo":"")+'">'+glyph("image")+missing+' صورة ناقصة بالرئيسية</span></div>'+
  '<div class="category-manager-help">'+glyph("info")+
- '<div><strong>توضيح:</strong> الصفحة الرئيسية تعرض '+featured.length+' عنصراً، أحدها «العروض المميزة» الموجود بقسم الإعلانات. قاعدة البيانات تضم '+rows.length+' سجلاً من الأقسام والفئات؛ الإضافية موجودة بالأسفل حتى لا تختلط بصور الرئيسية.</div></div>'+
+ '<div><strong>توضيح:</strong> كل '+homeCount+' فئة وقسم من قاعدة البيانات معروضة بالرئيسية، إضافة إلى «العروض المميزة» التابع للإعلانات. لإدارة العلاقات بين الأقسام والفئات استخدم القائمة المطوية بالأسفل.</div></div>'+
  '<div class="category-manager-tools"><label class="category-search">'+glyph("search")+
  '<input type="search" class="input" id="categoryManagerSearch" placeholder="ابحث عن فئة أو قسم..." autocomplete="off" value="'+html(state.categorySearch)+'" aria-label="البحث في الفئات"></label>'+
  '<label class="category-filter-missing"><input id="categoryMissingOnly" type="checkbox" '+(state.categoryMissingOnly?"checked":"")+'><span>اعرض الصور الناقصة فقط</span></label></div>'+
@@ -320,8 +325,8 @@ function renderTaxonomy(tableName){
  '<span>ترتيب العرض من اليمين إلى اليسار</span></div>'+
  '<div id="homeCategoryAdminGrid" class="home-category-admin-grid">'+categoryHomepageTiles()+'</div></section>'+
  '<details class="category-extra-details" id="categoryExtraDetails" '+(state.categoryExtrasOpen?"open":"")+'>'+
- '<summary><span>'+glyph("folder")+'إدارة الأقسام الرئيسية والفئات الإضافية</span>'+
- '<span class="category-extra-count">'+extraCount+' سجلات إضافية '+glyph("chevron-down")+'</span></summary>'+
+ '<summary><span>'+glyph("folder")+'إدارة الهيكل الرئيسي والفئات التابعة</span>'+
+ '<span class="category-extra-count">'+roots+' أقسام رئيسية '+glyph("chevron-down")+'</span></summary>'+
  '<div id="categoryManagerGroups">'+categoryManagerGroups()+'</div></details></div>';
 }
 function categoryHomepageTiles(){
