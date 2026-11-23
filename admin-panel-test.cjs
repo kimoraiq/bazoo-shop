@@ -10,7 +10,7 @@ const store={
  {id:3,name:"قرطاسية",slug:"stationery",parent_id:null,sort_order:2,active:true,show_on_home:true,image_url:null},
  {id:4,name:"أقلام",slug:"pens",parent_id:3,sort_order:1,active:true,show_on_home:true,image_url:null}
 ],
- brands:[],product_images:[],promotions:[],shipping_rates:[{governorate:"بغداد",price_iqd:4000,enabled:true}],orders:[{id:"o1",status:"new",order_items:[{id:12,order_id:"o1",status:"new"}]}],
+ brands:[],product_images:[],promotions:[],storefront_settings:[{key:"offers_category_cover",image_url:null}],shipping_rates:[{governorate:"بغداد",price_iqd:4000,enabled:true}],orders:[{id:"o1",status:"new",order_items:[{id:12,order_id:"o1",status:"new"}]}],
  order_items:[{id:12,order_id:"o1",status:"new"}]
 };
 class Query{
@@ -55,7 +55,7 @@ class FormData{
  has(k){return Object.hasOwn(this.values,k)}
 }
 const factory=new Function("createClient","document","window","sessionStorage","FormData","crypto","Image",source+
- "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent,renderTaxonomy,categoryManagerGroups,saveCategoryImage};");
+ "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent,renderTaxonomy,categoryManagerGroups,saveCategoryImage,saveOffersCategoryImage};");
 const admin=factory(()=>api,document,window,sessionStorage,FormData,{randomUUID:()=>"test-id"},function(){});
 function form(values,type="productForm"){
  const button={disabled:false};
@@ -125,6 +125,14 @@ function form(values,type="productForm"){
  assert.equal(store.categories[1].name,"هواتف","quick image upload must not rename the category");
  assert.equal(store.categories[3].image_url,null,"other category images must not be affected");
  assert.match(node("alert").textContent,/تم رفع صورة/);
+
+ const offerPicker={dataset:{},files:[imageFile],value:"",closest:sel=>sel===".category-upload-button"?picker:card};
+ const offerUrl=await admin.saveOffersCategoryImage(offerPicker);
+ assert.ok(offerUrl.includes("categories/offers/test-id.webp"),"Offers must use its own category-image path");
+ assert.equal(store.storefront_settings[0].image_url,offerUrl,"Offers image must persist in dedicated setting");
+ assert.equal(store.categories[1].image_url,url,"Offers photo must not replace regular category images");
+ assert.equal(store.promotions.length,0,"Changing Offers category photo must not modify banner rows");
+ assert.match(node("alert").textContent,/تم رفع صورة «العروض المميزة»/);
  // Promo editor also has a hidden id field and must not be rejected.
  const promo=form({id:"",title:"عرض خاص",subtitle:"خصم",placement:"home",link_url:"#/offers",product_id:"p1",sort_order:"0",active:"true",artwork_only:"true",is_demo:"false"},"promoForm");
  await admin.onSubmit({target:promo,preventDefault(){},stopPropagation(){}});
