@@ -65,11 +65,11 @@ const context={
  assert.match(node("#app").innerHTML,/merch-slider/,"homepage not rendered");
  assert.match(node("#app").innerHTML,/bazoo-category-explorer/,"category explorer missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
- assert.match(source,/children\.slice\(0,6\)/,"homepage must limit displayed categories to six");
- assert.match(source,/data-home-category-group/,"parent section tabs missing");
- assert.match(source,/roots=state\.categories\.filter/,"tabs must be derived from database parent categories");
+ assert.match(source,/const homeCategoryOrder=/,"approved category display order missing");
+ assert.doesNotMatch(source,/data-home-category-group/,"unrequested parent section tabs should be absent");
+ assert.match(source,/categoryBySlug\.get\(slug\)/,"each category tile must resolve the actual database category");
  assert.doesNotMatch(source,/class="category-emoji"/,"no emoji should be used instead of real category photos");
- assert.match(source,/data-home-category-more="1"/,"progressive category reveal control missing");
+ assert.match(source,/href="#\/offers"/,"featured offers tile must open offers");
  assert.match(html,/إلى جميع أنحاء العراق/,"correct nationwide delivery text missing");
  assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
@@ -83,7 +83,7 @@ const context={
  assert.match(source,/photo_desktop/,"desktop admin file input missing");
  assert.match(source,/photo_mobile/,"mobile admin file input missing");
  assert.match(source,/product_id/,"linked banner product selection missing");
- assert.match(source,/bazoo-cat-tile/,"compact linked category cards missing");
+ assert.match(source,/bazoo-category-tile/,"approved 2-row category tiles missing");
  assert.match(html,/bundle\.js\?v=20\d{6}[a-z0-9-]+/,"asset cache bust missing");
 
  assert.match(source,/function productDetailsPage\(/,"product details page missing");
