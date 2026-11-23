@@ -17,6 +17,7 @@ const state={
   {id:8,name:"الموبايلات",parent_id:2,active:true,sort_order:1},
   {id:13,name:"لابتوبات",parent_id:2,active:true,sort_order:2},
   {id:30,name:"كفرات هواتف",parent_id:8,active:true,sort_order:3},
+  {id:5,name:"مواد تأسيس",parent_id:1,active:true,sort_order:4},
   {id:17,name:"ثلاجات",parent_id:1,active:true,sort_order:1},
   {id:18,name:"غسالات",parent_id:1,active:true,sort_order:2},
   {id:9,name:"مواد مكتبية",parent_id:3,active:true,sort_order:1}
@@ -45,12 +46,17 @@ assert.match(childOptions,/الموبايلات/);
 assert.match(childOptions,/لابتوبات/);
 assert.match(childOptions,/كفرات هواتف/,"multi-level descendants must stay discoverable");
 assert.doesNotMatch(childOptions,/ثلاجات|غسالات/,"foreign-category names must never appear");
+assert.doesNotMatch(childOptions,/الموبايلات \/ الموبايلات/,"category name must never repeat itself in nested paths");
+assert.match(childOptions,/الموبايلات \/ كفرات هواتف/,"only actual ancestors belong in nested labels");
 assert.deepEqual(Array.from(filterProducts(),x=>x.id).sort(),["case","laptop","phone"]);
 state.category="8";
 assert.match(filters(),/<option value="8" selected>/);
 assert.deepEqual(Array.from(filterProducts(),x=>x.id).sort(),["case","phone"]);
 state.section="1";state.category="";
 assert.deepEqual(Array.from(filterProducts(),x=>x.id),["fridge"]);
+const applianceOptions=filters().match(/<select id="subcategoryFilter"[^>]*>([\s\S]*?)<\/select>/)?.[1]||"";
+assert.match(applianceOptions,/<option value="5" >مواد تأسيس<\/option>/,"Materials category should appear once");
+assert.doesNotMatch(applianceOptions,/مواد تأسيس \/ مواد تأسيس/,"original screenshot's duplicated category path must be fixed");
 state.section="";state.category="";
 assert.equal(filterProducts().length,4,"all categories should work without choosing a department");
 assert.match(app,/state\.section=root\?String\(root\.id\)/,"direct links must restore the root section");
