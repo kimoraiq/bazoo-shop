@@ -563,7 +563,7 @@ function renderLogin(message=""){
  byId("nav").innerHTML="";
  byId("content").innerHTML='<section class="auth-wrap surface"><img class="auth-mark" src="./%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png" alt="شعار بازو"><h2>مرحباً بك في إدارة بازو</h2><p class="help">سجّل الدخول إلى حساب المسؤول المصرّح له للتحكم بمتجرك بأمان.</p>'+
  (message?'<p class="notice-line">'+html(message)+'</p>':"")+
- '<form id="loginForm" class="form-grid">'+field("البريد الإلكتروني","email",state.user?.email||"",'type="email" required')+field("كلمة المرور","password","",'type="password" required')+formFooter("تسجيل الدخول")+'</form></section>';
+ '<form id="loginForm" class="form-grid" novalidate>'+field("البريد الإلكتروني","email",state.user?.email||"",'type="email" required')+field("كلمة المرور","password","",'type="password" required')+formFooter("تسجيل الدخول")+'</form></section>';
  renderNav();
 }
 async function onSubmit(event){
@@ -580,7 +580,10 @@ async function onSubmit(event){
  try{
   let result="";
   if(formType==="loginForm"){
-   const data=new FormData(form),auth=await db.auth.signInWithPassword({email:String(data.get("email")||"").trim(),password:String(data.get("password")||"")});
+   const data=new FormData(form);
+   const email=String(data.get("email")||"").trim(),password=String(data.get("password")||"");
+   if(!email||!password)throw Error("يرجى إدخال البريد الإلكتروني وكلمة المرور.");
+   const auth=await db.auth.signInWithPassword({email,password});
    if(auth.error)throw Error(auth.error.message);
    await authenticate();alertUser("تم تسجيل الدخول والتحقق من الصلاحيات.","success");
   }else{
