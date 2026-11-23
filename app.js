@@ -269,7 +269,7 @@ function filters(){
  const children=root?state.categories.filter(c=>c.active&&c.parent_id&&String(c.id)!==String(root.id)&&categoryChain(c.id).some(x=>String(x.id)===String(root.id))&&categoryChain(c.id).every(x=>x.active)):[];
  children.sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar"));
  const options=children.map(c=>{
-  const trail=categoryChain(c.id).slice(0,-1).reverse().filter(x=>String(x.id)!==String(root.id));
+  const trail=categoryChain(c.id).slice(1,-1).reverse().filter(x=>String(x.id)!==String(root.id));
   const name=trail.length?trail.map(x=>x.name).join(" / ")+" / "+c.name:c.name;
   return '<option value="'+c.id+'" '+(String(c.id)===String(state.category)?'selected':'')+'>'+esc(name)+'</option>';
  }).join("");
