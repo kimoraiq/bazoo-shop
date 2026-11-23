@@ -10,7 +10,11 @@ assert.match(app,/function categoryPhoto\(/,"uploaded category covers or safe fa
 assert.match(app,/show_on_home!==false/,"homepage visibility must be configurable per category");
 assert.match(app,/bazoo-cat-grid/,"compact homepage category cards missing");
 assert.match(app,/data-home-category-group/,"grouped category tab controls missing");
-assert.match(app,/ordered\.slice\(0,6\)/,"homepage must only show six category cards by default");
+assert.match(app,/roots=state\.categories\.filter/,"tabs should come from real root categories");
+assert.match(app,/children=all\.filter/,"each tab should only show descendants of its own parent");
+assert.doesNotMatch(app,/class="category-emoji"/,"emoji fallback must not replace real category photography");
+assert.match(app,/category-image-missing/,"new unpictured categories need a restrained visual fallback");
+assert.match(app,/children\.slice\(0,6\)/,"homepage must only show six child-category cards by default");
 assert.match(app,/data-home-category-more/,"all categories must remain available on demand");
 assert.match(app,/#\/categories\/'\+encodeURIComponent\(c\.id\)/,"every tile needs a direct link to its filtered category");
 assert.match(app,/function descendantIds\(/,"nested categories must resolve their descendant product IDs");
@@ -25,8 +29,8 @@ assert.match(admin,/function categoryAncestors\(/,"category parent choices must 
 assert.match(admin,/categoryAncestors\(parent,rows\)/,"editor must reject circular category links");
 assert.match(admin,/await requestSave\(table,record,id\)/,"editor must persist edits through database");
 assert.match(css,/\.bazoo-cat-grid/,"compact grid style missing");
-assert.match(css,/\.bazoo-cat-art \.category-thumb/,"real thumbnail style missing");
-assert.match(css,/\.bazoo-cat-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,"responsive two-column mobile layout missing");
-assert.match(html,/bundle\.js\?v=20261122catrefine36/,"storefront cache must be invalidated");
+assert.match(css,/\.bazoo-cat-photo \.category-thumb/,"real photographic thumbnail style missing");
+assert.match(css,/\.bazoo-cat-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"responsive three-column mobile layout missing");
+assert.match(html,/bundle\.js\?v=20261123category37/,"storefront cache must be invalidated");
 assert.match(adminHtml,/admin-panel\.js\?v=20261122categories34/,"admin cache must be invalidated");
 console.log("PASS BAZOO categories: home circular images, parent hierarchy, direct deep links, admin upload and mobile design");
