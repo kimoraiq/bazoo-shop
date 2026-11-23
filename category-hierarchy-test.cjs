@@ -30,11 +30,11 @@ assert.match(admin,/booleanSelect\("إظهاره في الصفحة الرئيس�
 assert.match(admin,/function categoryAncestors\(/,"administrator must preserve category hierarchy");
 assert.match(admin,/categoryAncestors\(parent,rows\)/,"self-referential category parents should be rejected");
 assert.match(css,/\.bazoo-category-grid\{[\s\S]*?grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/,"desktop should render 8 columns");
-assert.match(css,/grid-template-rows:repeat\(2,auto\)/,"desktop should render two rows");
+assert.match(css,/grid-template-rows:none!important/,"home category grid should flow into as many rows as needed");
 assert.match(css,/\.bazoo-category-circle/,"rounded imagery missing");
 assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatment missing");
 assert.match(css,/\.bazoo-category-scroller\{overflow-x:auto/,"mobile should horizontally scroll the full 2x8 layout");
-assert.match(html,/style\.css\?v=20261123allcats44/,"stylesheet cache must be refreshed");
-assert.match(html,/bundle\.js\?v=20261123allcats44/,"JavaScript cache must be refreshed");
+assert.match(html,/style\.css\?v=20261123merged45/,"stylesheet cache must be refreshed");
+assert.match(html,/bundle\.js\?v=20261123merged45/,"JavaScript cache must be refreshed");
 assert.match(adminHtml,/admin-panel\.js\?v=20261123allcats44/,"management portal must remain intact");
-console.log("PASS BAZOO approved 2x8 layout: exact order, photo tiles, independent offers, proper category parent links and mobile");
+console.log("PASS BAZOO all categories in one compact grid: original order retained, no extra heading, direct links");
