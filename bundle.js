@@ -69,6 +69,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1173,7 +1178,9 @@ function productCard(p){
  +'<button type="button" class="product-title-link" data-detail="'+p.id+'">'+esc(p.name)+'</button>'
  +'<div class="price-row"><strong class="cost">'+money(p.price_iqd)+'</strong>'+(off?'<span class="old">'+money(p.compare_at_iqd)+'</span>':'')+'</div>'
  +(p.is_demo?'<div class="demo-price-note">سعر للعرض فقط</div>':'')
- +'<div class="product-card-actions"><button class="btn primary card-cart-btn" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+icon("shopping-bag",17)+(p.stock<1?' غير متوفر':' أضف للعربة')+'</button></div></div></article>';
+ +'<div class="product-card-actions">'+(p.is_demo?
+  '<button type="button" class="btn primary card-cart-btn" data-detail="'+p.id+'">'+icon("eye",17)+'معاينة التفاصيل</button>':
+  '<button class="btn primary card-cart-btn" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+icon("shopping-bag",17)+(p.stock<1?' غير متوفر':' أضف للعربة')+'</button>')+'</div></div></article>';
 }
 function productGrid(ps){return ps.length?'<div class="grid-products">'+ps.map(productCard).join("")+'</div>':'<div class="notice">لا توجد منتجات منشورة في هذا القسم حالياً. ستظهر المنتجات هنا فور إضافتها من فريق بازو. </div>'}
 function productRail(products,id){
@@ -1341,7 +1348,7 @@ function categories(){
 }
 function offers(){return '<div class="page"><h1>عروض بازو <svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#percent"></use></svg></h1><p class="subtle">المنتجات المختارة للتخفيضات والعروض من قبل الفريق</p>'+productGrid(filterProducts({category:"",brand:"",q:"",onSale:true}))+'</div>'}
 function market(){return '<div class="page"><div class="notice" style="margin:45px auto;max-width:600px"><div class="empty-illustration"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#store"></use></svg></div><h1>أضف متجرك</h1><p>سيتوفر هذا القسم قريباً. نعمل على تقديم تجربة مميزة لأصحاب المتاجر.</p><button class="btn primary" data-go="home">الرجوع للرئيسية</button></div></div>'}
-function cartEntries(){return Object.entries(state.cart).map(([id,qty])=>({p:state.products.find(p=>p.id===id),qty:Number(qty)})).filter(x=>x.p&&x.qty>0)}
+function cartEntries(){return Object.entries(state.cart).map(([id,qty])=>({p:state.products.find(p=>p.id===id),qty:Number(qty)})).filter(x=>x.p&&!x.p.is_demo&&x.qty>0)}
 function subtotal(){return cartEntries().reduce((s,x)=>s+x.p.price_iqd*x.qty,0)}
 function cart(){
  const rows=cartEntries();
@@ -1416,9 +1423,12 @@ function productDetailsPage(id){
  +'<div class="product-detail-info"><span class="product-kicker">'+esc(brandName(p.brand_id)||catName(p.category_id))+'</span><h1>'+esc(p.name)+'</h1>'
  +'<div class="detail-price-block"><strong>'+money(p.price_iqd)+'</strong>'+(sale?'<del>'+money(p.compare_at_iqd)+'</del><span class="detail-discount-badge">خصم '+Math.round((p.compare_at_iqd-p.price_iqd)*100/p.compare_at_iqd)+'%</span>':'')+'</div>'
  +(p.is_demo?'<p class="demo-alert">'+icon("circle-alert",19)+' هذا منتج تجريبي للعرض فقط، ولا يمكن إتمام شرائه.</p>':'')
- +'<div class="stock-indicator">'+icon(p.stock>0?"check-circle":"circle-alert",18)+(p.stock>0?"متوفر في المخزون":"غير متوفر حالياً")+'</div>'
+ +(p.is_demo?'':('<div class="stock-indicator">'+icon(p.stock>0?"check-circle":"circle-alert",18)+(p.stock>0?"متوفر في المخزون":"غير متوفر حالياً")+'</div>'))
  +'<p class="detail-description">'+esc(p.description||"تظهر تفاصيل المنتج هنا بعد إضافتها من إدارة بازو.")+'</p>'
- +'<div class="detail-actions"><button class="btn accent" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+icon("shopping-bag",20)+' أضف للعربة</button><button class="btn outline" data-fav="'+p.id+'">'+icon("heart",18)+' المفضلة</button></div>'
+ +'<div class="detail-actions">'+(p.is_demo?
+  '<button class="btn accent" type="button" disabled>'+icon("eye",20)+' نموذج للعرض فقط</button>':
+  '<button class="btn accent" data-add="'+p.id+'" '+(p.stock<1?'disabled':'')+'>'+icon("shopping-bag",20)+' أضف للعربة</button>')+
+  '<button class="btn outline" data-fav="'+p.id+'">'+icon("heart",18)+' المفضلة</button></div>'
  +'<div class="detail-delivery">'+icon("truck",20)+' من بازو إلى باب منزلك في جميع أنحاء العراق. تظهر رسوم التوصيل قبل تأكيد الطلب.</div>'
  +'</div></div>'
  +(specs.length?'<section class="detail-specs"><h2>المواصفات</h2><div class="spec-table">'+specs.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div></section>':'')
@@ -1436,7 +1446,7 @@ function changeGallery(index){
  state.galleryIndex=next;
 }
 function detail(id){go("product/"+id);}
-function add(id){const p=state.products.find(x=>x.id===id);if(!p||p.stock<=0)return notify("المنتج غير متوفر");const qty=Number(state.cart[id]||0);if(qty>=p.stock)return notify("لقد وصلت إلى الحد المتوفر من المخزون.");state.cart[id]=Math.min(99,qty+1);persist();notify("تمت إضافة المنتج إلى سلة التسوق. ")}
+function add(id){const p=state.products.find(x=>x.id===id);if(p?.is_demo)return notify("هذا المنتج تجريبي للمعاينة فقط، وغير متاح للشراء.");if(!p||p.stock<=0)return notify("المنتج غير متوفر");const qty=Number(state.cart[id]||0);if(qty>=p.stock)return notify("لقد وصلت إلى الحد المتوفر من المخزون.");state.cart[id]=Math.min(99,qty+1);persist();notify("تمت إضافة المنتج إلى سلة التسوق. ")}
 function updateQty(id,delta){const p=state.products.find(x=>x.id===id);if(!p)return;const qty=Number(state.cart[id]||0)+delta;if(qty<=0)delete state.cart[id];else state.cart[id]=Math.min(qty,p.stock,99);persist();render()}
 function toggleFav(id){state.favs=state.favs.includes(id)?state.favs.filter(x=>x!==id):[...state.favs,id];persist();render()}
 function authMode(mode){
