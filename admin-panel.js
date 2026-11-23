@@ -300,20 +300,42 @@ function renderTaxonomy(tableName){
    '<tr><td colspan="4">لا توجد علامات تجارية.</td></tr>');
  }
  const rows=state.records.categories||[];
- const missing=rows.filter(c=>!c.image_url).length;
- const primary=rows.filter(c=>!c.parent_id).length;
- return '<div class="category-manager">'+
- '<div class="category-manager-intro"><div><h2>صور الفئات والأقسام</h2><p>كل قسم رئيسي وتحتَه فئاته. اضغط «رفع صورة» على الفئة المطلوبة، وسيتم حفظها مباشرة.</p></div>'+
+ const featured=homepageCategoryRecords(rows);
+ const featuredIds=new Set(featured.filter(x=>!x.isOffer).map(x=>String(x.id)));
+ const extraCount=rows.filter(x=>!featuredIds.has(String(x.id))).length;
+ const missing=featured.filter(x=>!x.isOffer&&!x.image_url).length;
+ return '<div class="category-manager category-manager-v2">'+
+ '<div class="category-manager-intro"><div><h2>صور فئات الصفحة الرئيسية</h2>'+
+ '<p>نفس العناصر ونفس ترتيب المتجر. صورة كل فئة تنرفع من بطاقتها مباشرة، بدون اختلاط بالأقسام الأخرى.</p></div>'+
  '<button type="button" class="button" data-action="new" data-table="categories">'+glyph("plus")+'إضافة قسم أو فئة</button></div>'+
- '<div class="category-manager-stats"><span>'+glyph("grid")+html(primary)+' أقسام رئيسية</span>'+
- '<span>'+glyph("package")+html(rows.length)+' فئات وأقسام</span>'+
- '<span class="'+(missing?"needs-photo":"")+'">'+glyph("image")+html(missing)+' بدون صور</span></div>'+
- '<div class="category-manager-tools"><label class="category-search">'+glyph("search")+
- '<input type="search" class="input" id="categoryManagerSearch" placeholder="ابحث باسم الفئة أو القسم..." autocomplete="off" value="'+html(state.categorySearch)+'" aria-label="البحث في الفئات"></label>'+
- '<label class="category-filter-missing"><input id="categoryMissingOnly" type="checkbox" '+(state.categoryMissingOnly?"checked":"")+'><span>الفئات التي تحتاج صور فقط</span></label></div>'+
+ '<div class="category-manager-stats"><span>'+glyph("image")+featured.length+' عنصراً بالرئيسية</span>'+
+ '<span>'+glyph("grid")+extraCount+' أقسام وفئات أخرى</span>'+
+ '<span class="'+(missing?"needs-photo":"")+'">'+glyph("image")+missing+' صورة ناقصة بالرئيسية</span></div>'+
  '<div class="category-manager-help">'+glyph("info")+
- '<div><strong>مكان رفع الصور:</strong> تحت كل قسم ستجد الفئات التابعة له. اضغط <b>«رفع صورة»</b> أو <b>«تغيير الصورة»</b> على البطاقة نفسها واختر ملف PNG أو WEBP أو JPG. تُضغط الصورة تلقائياً إلى 15 كيلوبايت. <span>صور «العروض المميزة» تُدار من صفحة الإعلانات.</span></div></div>'+
- '<div id="categoryManagerGroups">'+categoryManagerGroups()+'</div></div>';
+ '<div><strong>توضيح:</strong> الصفحة الرئيسية تعرض '+featured.length+' عنصراً، أحدها «العروض المميزة» الموجود بقسم الإعلانات. قاعدة البيانات تضم '+rows.length+' سجلاً من الأقسام والفئات؛ الإضافية موجودة بالأسفل حتى لا تختلط بصور الرئيسية.</div></div>'+
+ '<div class="category-manager-tools"><label class="category-search">'+glyph("search")+
+ '<input type="search" class="input" id="categoryManagerSearch" placeholder="ابحث عن فئة أو قسم..." autocomplete="off" value="'+html(state.categorySearch)+'" aria-label="البحث في الفئات"></label>'+
+ '<label class="category-filter-missing"><input id="categoryMissingOnly" type="checkbox" '+(state.categoryMissingOnly?"checked":"")+'><span>اعرض الصور الناقصة فقط</span></label></div>'+
+ '<section class="category-home-section"><div class="category-home-section-head"><h3>الفئات الظاهرة في الرئيسية <small>('+featured.length+')</small></h3>'+
+ '<span>ترتيب العرض من اليمين إلى اليسار</span></div>'+
+ '<div id="homeCategoryAdminGrid" class="home-category-admin-grid">'+categoryHomepageTiles()+'</div></section>'+
+ '<details class="category-extra-details" id="categoryExtraDetails" '+(state.categoryExtrasOpen?"open":"")+'>'+
+ '<summary><span>'+glyph("folder")+'إدارة الأقسام الرئيسية والفئات الإضافية</span>'+
+ '<span class="category-extra-count">'+extraCount+' سجلات إضافية '+glyph("chevron-down")+'</span></summary>'+
+ '<div id="categoryManagerGroups">'+categoryManagerGroups()+'</div></details></div>';
+}
+function categoryHomepageTiles(){
+ const rows=state.records.categories||[];
+ const query=state.categorySearch.trim().toLocaleLowerCase("ar");
+ const filtered=homepageCategoryRecords(rows).filter(item=>{
+  if(state.categoryMissingOnly&&(item.isOffer||item.image_url))return false;
+  if(!query)return true;
+  const names=[item.name,item.slug,HOME_CATEGORY_LABELS[item.slug],
+   ...(item.isOffer?[]:categoryAncestors(item,rows).map(x=>x.name))];
+  return names.some(x=>String(x||"").toLocaleLowerCase("ar").includes(query));
+ });
+ return filtered.length?filtered.map(x=>homepageCategoryCard(x,rows)).join(""):
+ '<div class="category-manager-empty">لا توجد فئات مطابقة للبحث.</div>';
 }
 function renderShipping(){
  const rows=state.records.shipping||[];
@@ -735,11 +757,16 @@ async function onSubmit(event){
  finally{form.dataset.pending="false";if(button)button.disabled=false}
 }
 document.addEventListener("submit",onSubmit,true);
+document.addEventListener("toggle",event=>{
+ if(event.target?.id==="categoryExtraDetails")state.categoryExtrasOpen=event.target.open;
+},true);
 document.addEventListener("input",event=>{
  if(event.target.id==="categoryManagerSearch"){
   state.categorySearch=String(event.target.value||"");
   const container=byId("categoryManagerGroups");
   if(container)container.innerHTML=categoryManagerGroups();
+  const homeGrid=byId("homeCategoryAdminGrid");
+  if(homeGrid)homeGrid.innerHTML=categoryHomepageTiles();
   return;
  }
  if(event.target.id==="productSearch"){
@@ -766,6 +793,8 @@ document.addEventListener("change",async event=>{
   state.categoryMissingOnly=Boolean(control.checked);
   const container=byId("categoryManagerGroups");
   if(container)container.innerHTML=categoryManagerGroups();
+  const homeGrid=byId("homeCategoryAdminGrid");
+  if(homeGrid)homeGrid.innerHTML=categoryHomepageTiles();
   return;
  }
  if(control.matches?.(".category-photo-input")){
