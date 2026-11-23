@@ -572,6 +572,37 @@ async function saveProduct(form){
  }catch(err){throw Error("تم حفظ بيانات المنتج في قاعدة البيانات، لكن تعذّر إكمال الصور: "+err.message)}
  return "تم حفظ المنتج والتحقق من بياناته في قاعدة البيانات.";
 }
+async function saveOffersCategoryImage(input){
+ if(!can("categories"))throw Error("هذه الصلاحية غير مفعّلة لحسابك.");
+ const image=input.files?.[0];
+ if(!image||input.dataset.pending==="true")return "";
+ input.dataset.pending="true";
+ const button=input.closest(".category-upload-button");
+ const card=input.closest(".home-category-admin-card");
+ button?.classList?.add("is-uploading");
+ card?.classList?.add("is-saving");
+ try{
+  clearAlert();
+  // A dedicated storefront setting: changing this photo never alters promotion banners.
+  const url=await upload(image,"product-images","categories/offers",15360,650,650);
+  if(!url)throw Error("تعذّر قراءة صورة العروض.");
+  const {data,error}=await db.from("storefront_settings").update({image_url:url})
+   .eq("key","offers_category_cover").select("key,image_url").single();
+  if(error||data?.image_url!==url)throw Error(error?.message||"تعذّر تثبيت صورة العروض بقاعدة البيانات.");
+  const verified=await db.from("storefront_settings").select("key,image_url")
+   .eq("key","offers_category_cover").single();
+  if(verified.error||verified.data?.image_url!==url)throw Error("لم يتم تأكيد حفظ صورة العروض. يُرجى إعادة المحاولة.");
+  state.records.offersCategoryCover=url;
+  alertUser("تم رفع صورة «العروض المميزة» وحفظها بنجاح.","success");
+  await reload();
+  return url;
+ }finally{
+  input.dataset.pending="false";
+  button?.classList?.remove("is-uploading");
+  card?.classList?.remove("is-saving");
+  input.value="";
+ }
+}
 async function saveCategoryImage(input){
  if(!can("categories"))throw Error("هذه الصلاحية غير مفعّلة لحسابك.");
  const id=String(input.dataset.categoryId||"");
@@ -811,6 +842,11 @@ document.addEventListener("change",async event=>{
   if(container)container.innerHTML=categoryManagerGroups();
   const homeGrid=byId("homeCategoryAdminGrid");
   if(homeGrid)homeGrid.innerHTML=categoryHomepageTiles();
+  return;
+ }
+ if(control.matches?.(".offers-category-photo-input")){
+  try{await saveOffersCategoryImage(control)}
+  catch(error){console.error("BAZOO offers category cover",error);alertUser("تعذّر حفظ صورة العروض: "+(error?.message||"خطأ غير معروف"))}
   return;
  }
  if(control.matches?.(".category-photo-input")){
