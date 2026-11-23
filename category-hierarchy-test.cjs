@@ -33,8 +33,12 @@ assert.match(css,/\.bazoo-category-grid\{[\s\S]*?grid-template-columns:repeat\(8
 assert.match(css,/grid-template-rows:none!important/,"home category grid should flow into as many rows as needed");
 assert.match(css,/\.bazoo-category-circle/,"rounded imagery missing");
 assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatment missing");
-assert.match(css,/\.bazoo-category-scroller\{overflow-x:auto/,"mobile should horizontally scroll the full 2x8 layout");
-assert.match(html,/style\.css\?v=20261123offers46/,"stylesheet cache must be refreshed");
+assert.match(css,/BAZOO v48/,"the larger responsive circles layout must be present");
+assert.match(css,/\.bazoo-category-scroller\{[\s\S]*?overflow-x:visible!important/,"mobile category gallery must not require sideways scrolling");
+assert.match(css,/\.bazoo-category-grid\{[\s\S]*?grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/,"mobile category gallery must show three balanced columns");
+assert.match(css,/\.bazoo-category-circle\{[\s\S]*?clamp\(80px,25vw,111px\)/,"mobile category circles must be large enough to recognize");
+assert.match(css,/\.bazoo-category-title\{[\s\S]*?font-size:12px!important/,"mobile category labels must remain readable");
+assert.match(html,/style\.css\?v=20261123circles48/,"stylesheet cache must be refreshed");
 assert.match(html,/bundle\.js\?v=20261123names47/,"JavaScript cache must be refreshed");
 assert.match(adminHtml,/admin-panel\.js\?v=20261123names47/,"management portal must remain intact");
-console.log("PASS BAZOO all categories in one compact grid: original order retained, no extra heading, direct links");
+console.log("PASS BAZOO larger responsive category gallery: no mobile horizontal overflow, three clear columns, all links unchanged");
