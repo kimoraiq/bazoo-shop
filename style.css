@@ -1971,3 +1971,54 @@ html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){
  .bazoo-category-circle,.bazoo-category-circle .category-thumb{transition:none!important}
 }
+
+
+/* BAZOO catalog filters — separate section and dependent subcategory selectors */
+.category-results-page .filter-panel.bazoo-catalog-filters{
+ display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ gap:14px!important;align-items:end;direction:rtl;
+ padding:22px!important;margin:20px 0 22px!important;
+ background:linear-gradient(130deg,#fff,#fcfaff);
+ border:1px solid #eae4f1;border-radius:18px;
+ box-shadow:0 4px 20px rgba(46,21,82,.035)
+}
+.category-results-page .bazoo-catalog-filters label{
+ display:flex!important;flex-direction:column;min-width:0;gap:8px;
+ color:#332448;font-weight:900;font-size:12px;text-align:right
+}
+.category-results-page .bazoo-catalog-filters select,
+.category-results-page .bazoo-catalog-filters input{
+ display:block!important;width:100%;max-width:100%;min-width:0;
+ min-height:49px;padding:11px 13px;
+ background:#fff;border:1px solid #e5dcef;border-radius:12px;
+ color:#2e2345;font-size:12.5px;font-weight:700;
+ font-family:Tajawal,Arial,sans-serif;
+ outline:none;box-shadow:none;transition:border-color .2s,box-shadow .2s
+}
+.category-results-page .bazoo-catalog-filters select:focus,
+.category-results-page .bazoo-catalog-filters input:focus{
+ border-color:#9874d2;box-shadow:0 0 0 3px rgba(88,34,175,.08)
+}
+.category-results-page .bazoo-catalog-filters select:disabled{
+ color:#9c91a8;background:#f6f3f9;border-color:#ebe6f1;cursor:not-allowed
+}
+.category-results-page .bazoo-catalog-filters option{font-weight:500}
+@media(max-width:940px){
+ .category-results-page .filter-panel.bazoo-catalog-filters{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:16px!important;gap:14px!important
+ }
+}
+@media(max-width:560px){
+ .category-results-page .filter-panel.bazoo-catalog-filters{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  padding:13px!important;gap:12px 9px!important;border-radius:14px
+ }
+ .category-results-page .bazoo-catalog-filters label{font-size:11px;gap:6px}
+ .category-results-page .bazoo-catalog-filters select,
+ .category-results-page .bazoo-catalog-filters input{
+  min-height:43px;padding:8px;font-size:11px;border-radius:9px
+ }
+}
+@media(max-width:360px){
+ .category-results-page .filter-panel.bazoo-catalog-filters{grid-template-columns:1fr!important}
+}
