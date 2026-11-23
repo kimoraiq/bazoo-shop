@@ -16,7 +16,7 @@ assert.match(app,/categoryBySlug\.get\(slug\)/,"tiles must resolve actual catego
 assert.match(app,/state\.categories\.filter/,"categories should come from live database");
 assert.match(app,/categoryChain\(c\.id\)/,"hidden or inactive parent categories must not leak");
 assert.match(app,/data-parent-id/,"category hierarchy must be preserved in tiles");
-assert.match(app,/href="#\/categories\/'\+encodeURIComponent\(category\.id\)/,"clicking a category must open its own catalog");
+assert.match(app,/href="#\/categories\/'\+encodeURIComponent\(item\.id\)/,"clicking a category must open its own catalog");
 assert.match(app,/function descendantIds\(/,"catalog must include nested products");
 assert.match(app,/categoryChain\(p\.category_id\)/,"inactive ancestors must hide associated products");
 assert.match(app,/if\(route==="categories"&&parts\[1\]\)/,"linked category routes must survive reloading");
@@ -34,7 +34,7 @@ assert.match(css,/grid-template-rows:repeat\(2,auto\)/,"desktop should render tw
 assert.match(css,/\.bazoo-category-circle/,"rounded imagery missing");
 assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatment missing");
 assert.match(css,/\.bazoo-category-scroller\{overflow-x:auto/,"mobile should horizontally scroll the full 2x8 layout");
-assert.match(html,/style\.css\?v=20261123ui41/,"stylesheet cache must be refreshed");
-assert.match(html,/bundle\.js\?v=20261123ui41/,"JavaScript cache must be refreshed");
-assert.match(adminHtml,/admin-panel\.js\?v=20261123catadmin43/,"management portal must remain intact");
+assert.match(html,/style\.css\?v=20261123allcats44/,"stylesheet cache must be refreshed");
+assert.match(html,/bundle\.js\?v=20261123allcats44/,"JavaScript cache must be refreshed");
+assert.match(adminHtml,/admin-panel\.js\?v=20261123allcats44/,"management portal must remain intact");
 console.log("PASS BAZOO approved 2x8 layout: exact order, photo tiles, independent offers, proper category parent links and mobile");
