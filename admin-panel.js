@@ -142,7 +142,11 @@ async function reload(){
   }
   else if(tab==="promos"){const [promotions,products]=await Promise.all([read("promotions","sort_order"),read("products","created_at")]);Object.assign(state.records,{promotions,products});}
   else if(tab==="shipping")state.records.shipping=await read("shipping_rates","governorate");
-  else if(tab==="categories")state.records.categories=await read("categories","sort_order");
+  else if(tab==="categories"){
+    const [categories,settings]=await Promise.all([read("categories","sort_order"),read("storefront_settings","key")]);
+    state.records.categories=categories;
+    state.records.offersCategoryCover=settings.find(x=>x.key==="offers_category_cover")?.image_url||null;
+  }
   else if(tab==="brands")state.records.brands=await read("brands","name");
   else if(tab==="members")state.records.members=await read("admin_members","created_at");
   renderContent();
@@ -230,7 +234,7 @@ function categoryCard(category,rows,isRoot=false){
  '</div></article>';
 }
 function homepageCategoryRecords(rows){
- const active=rows.filter(row=>row.active&&row.show_on_home!==false&&categoryAncestors(row,rows).every(parent=>parent.active));
+ const active=rows.filter(row=>row.parent_id&&row.active&&row.show_on_home!==false&&categoryAncestors(row,rows).every(parent=>parent.active));
  const bySlug=new Map(active.map(row=>[row.slug,row]));
  const curated=HOME_CATEGORY_ORDER.map(slug=>slug==="offers"?{slug,name:"العروض المميزة",isOffer:true}:bySlug.get(slug)).filter(Boolean);
  const pinned=new Set(HOME_CATEGORY_ORDER);
@@ -244,11 +248,18 @@ function homepageCategoryRecords(rows){
  return [...curated,...extras].map((row,position)=>({...row,position}));
 }
 function homepageCategoryCard(item,rows){
- if(item.isOffer)return '<article class="home-category-admin-card offer-category-admin" data-home-position="'+item.position+'">'+
-  '<div class="home-category-admin-image offer-image">'+glyph("sparkles")+'<b>BAZOO</b></div>'+
-  '<span class="home-category-admin-position">رقم '+(item.position+1)+' بالرئيسية</span>'+
-  '<h3>العروض المميزة</h3><p>الصورة تُدار من قسم الإعلانات</p>'+
-  '<div class="home-category-admin-actions"><button class="category-edit-button" type="button" data-tab="promos">'+glyph("settings")+'إدارة العروض</button></div></article>';
+ if(item.isOffer){
+  const image=state.records.offersCategoryCover;
+  const img=image&&safeUrl(image)?'<img class="offer-cover-preview" src="'+safeUrl(image)+'" alt="صورة العروض المميزة" loading="lazy">':glyph("sparkles")+'<b>BAZOO</b>';
+  const picker='<label class="category-upload-button" title="رفع صورة العروض المميزة">'+glyph("image")+'<span>'+(image?"تغيير الصورة":"رفع صورة")+'</span>'+
+   '<input type="file" class="offers-category-photo-input" accept="image/png,image/jpeg,image/webp" aria-label="رفع صورة العروض المميزة"></label>';
+  return '<article class="home-category-admin-card offer-category-admin" data-home-position="'+item.position+'">'+
+   '<div class="home-category-admin-image offer-image">'+img+'</div>'+
+   '<span class="home-category-admin-position">رقم '+(item.position+1)+' بالرئيسية</span>'+
+   '<h3>العروض المميزة</h3><p>صورة مستقلة عن البنرات والإعلانات</p>'+
+   '<div class="home-category-admin-actions">'+picker+
+   '<button class="category-edit-button" type="button" data-tab="promos">'+glyph("settings")+'الإعلانات</button></div></article>';
+ }
  const title=HOME_CATEGORY_LABELS[item.slug]||item.name;
  const parent=categoryAncestors(item,rows).at(-1);
  return '<article class="home-category-admin-card" data-home-position="'+item.position+'" data-category-id="'+html(item.id)+'">'+
@@ -308,7 +319,7 @@ function renderTaxonomy(tableName){
  const featured=homepageCategoryRecords(rows);
  const homeCount=featured.filter(x=>!x.isOffer).length;
  const roots=rows.filter(x=>!x.parent_id).length;
- const missing=featured.filter(x=>!x.isOffer&&!x.image_url).length;
+ const missing=featured.filter(x=>x.isOffer?!state.records.offersCategoryCover:!x.image_url).length;
  return '<div class="category-manager category-manager-v2">'+
  '<div class="category-manager-intro"><div><h2>صور فئات الصفحة الرئيسية</h2>'+
  '<p>نفس العناصر ونفس ترتيب المتجر. صورة كل فئة تنرفع من بطاقتها مباشرة، بدون اختلاط بالأقسام الأخرى.</p></div>'+
@@ -317,7 +328,7 @@ function renderTaxonomy(tableName){
  '<span>'+glyph("grid")+rows.length+' قسم وفئة بقاعدة البيانات</span>'+
  '<span class="'+(missing?"needs-photo":"")+'">'+glyph("image")+missing+' صورة ناقصة بالرئيسية</span></div>'+
  '<div class="category-manager-help">'+glyph("info")+
- '<div><strong>توضيح:</strong> كل '+homeCount+' فئة وقسم من قاعدة البيانات معروضة بالرئيسية، إضافة إلى «العروض المميزة» التابع للإعلانات. لإدارة العلاقات بين الأقسام والفئات استخدم القائمة المطوية بالأسفل.</div></div>'+
+ '<div><strong>توضيح:</strong> تظهر الفئات الفرعية فقط في هذه الشبكة، أما الأقسام الرئيسية فتبقى في شريط الأقسام وفي إدارة الهيكل بالأسفل. صورة «العروض المميزة» ترفعها من بطاقتها هنا.</div></div>'+
  '<div class="category-manager-tools"><label class="category-search">'+glyph("search")+
  '<input type="search" class="input" id="categoryManagerSearch" placeholder="ابحث عن فئة أو قسم..." autocomplete="off" value="'+html(state.categorySearch)+'" aria-label="البحث في الفئات"></label>'+
  '<label class="category-filter-missing"><input id="categoryMissingOnly" type="checkbox" '+(state.categoryMissingOnly?"checked":"")+'><span>اعرض الصور الناقصة فقط</span></label></div>'+
@@ -333,7 +344,7 @@ function categoryHomepageTiles(){
  const rows=state.records.categories||[];
  const query=state.categorySearch.trim().toLocaleLowerCase("ar");
  const filtered=homepageCategoryRecords(rows).filter(item=>{
-  if(state.categoryMissingOnly&&(item.isOffer||item.image_url))return false;
+  if(state.categoryMissingOnly&&(item.isOffer?Boolean(state.records.offersCategoryCover):Boolean(item.image_url)))return false;
   if(!query)return true;
   const names=[item.name,item.slug,HOME_CATEGORY_LABELS[item.slug],
    ...(item.isOffer?[]:categoryAncestors(item,rows).map(x=>x.name))];
