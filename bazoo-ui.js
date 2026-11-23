@@ -27,7 +27,7 @@
     if (!ui) return;
     const selected = select.options[select.selectedIndex];
     ui.value.textContent = selected ? clean(selected.textContent) : "اختر من القائمة";
-    ui.trigger.disabled = select.disabled;
+    if (ui.trigger.disabled !== select.disabled) ui.trigger.disabled = select.disabled;
     ui.wrap.classList.toggle("bz-is-disabled", select.disabled);
     ui.wrap.classList.toggle("bz-is-placeholder", !select.value);
     if (opened?.select === select) {
