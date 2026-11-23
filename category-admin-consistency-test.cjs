@@ -56,6 +56,6 @@ assert.match(css,/\.home-category-admin-grid\{/,"Responsive primary grid is miss
 assert.match(css,/\.home-category-admin-card h3\{/,"Card title styling is missing");
 assert.match(css,/overflow-wrap:anywhere/,"Long category names must wrap rather than clip");
 assert.match(css,/\.category-extra-details>summary/,"Collapsible category heading is missing");
-assert.match(index,/admin-panel\.css\?v=20261123allcats44/);
-assert.match(index,/admin-panel\.js\?v=20261123allcats44/);
+assert.match(index,/admin-panel\.css\?v=20261123offers46/);
+assert.match(index,/admin-panel\.js\?v=20261123offers46/);
 console.log("PASS BAZOO: all 19 child categories plus independently editable Offers cover; root sections remain outside gallery");
