@@ -2203,3 +2203,113 @@ html{scroll-behavior:smooth}
  .bazoo-category-circle,.bazoo-category-circle .category-thumb{transition:none!important}
  .bazoo-category-scroller{scroll-behavior:auto!important}
 }
+
+
+/* BAZOO v52 — premium category carousel interaction with smart edge controls */
+.bazoo-category-frame{position:relative;min-width:0;isolation:isolate}
+.bazoo-category-frame::before,
+.bazoo-category-frame::after{
+ content:"";position:absolute;z-index:2;top:2px;bottom:9px;
+ width:26px;pointer-events:none;opacity:0;
+ transition:opacity .22s ease
+}
+.bazoo-category-frame::before{
+ right:0;background:linear-gradient(to left,#fff 8%,rgba(255,255,255,0))
+}
+.bazoo-category-frame::after{
+ left:0;background:linear-gradient(to right,#fff 8%,rgba(255,255,255,0))
+}
+.bazoo-category-explorer.has-scroll-right .bazoo-category-frame::before{opacity:1}
+.bazoo-category-explorer.has-scroll-left .bazoo-category-frame::after{opacity:1}
+.bazoo-category-scroller{
+ scrollbar-width:none!important;
+ scroll-snap-type:x proximity!important;
+ cursor:grab
+}
+.bazoo-category-scroller::-webkit-scrollbar{display:none!important}
+.bazoo-category-scroller.is-dragging{
+ cursor:grabbing!important;
+ scroll-behavior:auto!important;
+ scroll-snap-type:none!important;
+ user-select:none!important;
+ -webkit-user-select:none!important
+}
+.bazoo-category-scroller.is-dragging *{
+ user-select:none!important;-webkit-user-select:none!important
+}
+.bazoo-category-scroll-arrow{
+ width:35px;height:35px;min-width:35px;min-height:35px;
+ background:#fff!important;
+ border:1px solid #e7dbf0!important;
+ border-radius:50%!important;
+ color:#6730a2!important;
+ box-shadow:0 3px 11px rgba(69,25,118,.07);
+ transition:transform .18s ease,background .18s ease,opacity .18s ease,box-shadow .18s ease!important
+}
+.bazoo-category-scroll-arrow:not(:disabled):hover{
+ color:#fff!important;
+ background:#642bb0!important;
+ box-shadow:0 6px 17px rgba(95,35,175,.20);
+ transform:translateY(-2px)
+}
+.bazoo-category-scroll-arrow:disabled{
+ color:#bdb0ce!important;
+ opacity:.36!important;
+ cursor:not-allowed!important;
+ box-shadow:none!important;
+ background:#faf8fc!important
+}
+.bazoo-category-scroll-arrow:focus-visible{
+ outline:3px solid #f4771c!important;outline-offset:2px
+}
+.bazoo-category-scroll-controls{gap:7px!important}
+.bazoo-category-heading-actions{gap:10px 14px!important}
+.bazoo-category-scroll-hint{color:#9587a5!important;font-weight:800}
+.bazoo-category-footer{
+ display:flex;align-items:center;justify-content:center;
+ gap:12px;direction:rtl;
+ min-height:24px;padding:2px 6px 0;margin-top:3px
+}
+.bazoo-category-scroll-progress{
+ position:relative;display:block;
+ width:clamp(90px,16vw,168px);height:5px;
+ border-radius:100px;background:#eee7f5;
+ overflow:hidden;flex:0 0 auto
+}
+.bazoo-category-scroll-thumb{
+ display:block;position:absolute;right:0;top:0;bottom:0;
+ width:18%;border-radius:100px;
+ background:linear-gradient(90deg,#e77a2b,#7736b9);
+ box-shadow:0 0 9px rgba(101,39,173,.15);
+ transition:right .10s linear
+}
+.bazoo-category-page-count{
+ min-width:35px;font:800 11px Tajawal,Arial,sans-serif;
+ color:#877597;direction:ltr;white-space:nowrap;text-align:center
+}
+.bazoo-category-explorer.no-category-overflow .bazoo-category-scroll-controls,
+.bazoo-category-explorer.no-category-overflow .bazoo-category-scroll-hint,
+.bazoo-category-explorer.no-category-overflow .bazoo-category-footer{display:none!important}
+@media(max-width:620px){
+ .bazoo-category-heading-actions{gap:7px 9px!important}
+ .bazoo-category-scroll-arrow{
+  width:30px;height:30px;min-width:30px;min-height:30px;
+  box-shadow:0 2px 7px rgba(69,25,118,.06)
+ }
+ .bazoo-category-frame::before,
+ .bazoo-category-frame::after{width:16px;bottom:8px}
+ .bazoo-category-scroll-hint{font-size:9px!important}
+ .bazoo-category-footer{gap:9px;min-height:19px;margin-top:0;padding:0 2px}
+ .bazoo-category-scroll-progress{width:112px;height:4px}
+ .bazoo-category-page-count{font-size:10px}
+}
+@media(max-width:380px){
+ .bazoo-category-scroll-hint{display:none!important}
+ .bazoo-category-heading-actions{gap:6px!important}
+ .bazoo-category-scroll-arrow{width:28px;height:28px;min-width:28px;min-height:28px}
+ .bazoo-category-scroll-progress{width:92px}
+}
+@media(prefers-reduced-motion:reduce){
+ .bazoo-category-frame::before,.bazoo-category-frame::after,
+ .bazoo-category-scroll-thumb,.bazoo-category-scroll-arrow{transition:none!important}
+}
