@@ -44,6 +44,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1036,6 +1041,8 @@ function notify(msg){
   if(panel){panel.hidden=false;panel.textContent=message;panel.classList.toggle("admin-save-failure",/^(تعذّر|لم |خطأ)/.test(message))}
  }
  const x=$("#toast");x.textContent=message;x.classList.add("show");
+ x.classList.toggle("bz-error",/^(تعذّر|خطأ|لم |فشل|يرجى)/.test(message));
+ x.classList.toggle("bz-success",/^(تم |نجح|أُضيف|حُفظ)/.test(message));
  clearTimeout(notify.timer);
  notify.timer=setTimeout(()=>x.classList.remove("show"),5000);
 }
@@ -1283,7 +1290,7 @@ function filters(){
  const children=root?state.categories.filter(c=>c.active&&c.parent_id&&String(c.id)!==String(root.id)&&categoryChain(c.id).some(x=>String(x.id)===String(root.id))&&categoryChain(c.id).every(x=>x.active)):[];
  children.sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar"));
  const options=children.map(c=>{
-  const trail=categoryChain(c.id).slice(0,-1).reverse().filter(x=>String(x.id)!==String(root.id));
+  const trail=categoryChain(c.id).slice(1,-1).reverse().filter(x=>String(x.id)!==String(root.id));
   const name=trail.length?trail.map(x=>x.name).join(" / ")+" / "+c.name:c.name;
   return '<option value="'+c.id+'" '+(String(c.id)===String(state.category)?'selected':'')+'>'+esc(name)+'</option>';
  }).join("");
