@@ -28,6 +28,7 @@ jobs:
           node --check admin-panel.js
           node admin-panel-test.cjs
           node category-hierarchy-test.cjs
+          node catalog-dependent-filters-test.cjs
           node admin-brand-ui-test.cjs
           node smoke-test.cjs
           node admin-role-test.cjs
