@@ -35,6 +35,6 @@ assert.match(css,/\.bazoo-category-circle/,"rounded imagery missing");
 assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatment missing");
 assert.match(css,/\.bazoo-category-scroller\{overflow-x:auto/,"mobile should horizontally scroll the full 2x8 layout");
 assert.match(html,/style\.css\?v=20261123offers46/,"stylesheet cache must be refreshed");
-assert.match(html,/bundle\.js\?v=20261123offers46/,"JavaScript cache must be refreshed");
-assert.match(adminHtml,/admin-panel\.js\?v=20261123offers46/,"management portal must remain intact");
+assert.match(html,/bundle\.js\?v=20261123names47/,"JavaScript cache must be refreshed");
+assert.match(adminHtml,/admin-panel\.js\?v=20261123names47/,"management portal must remain intact");
 console.log("PASS BAZOO all categories in one compact grid: original order retained, no extra heading, direct links");
