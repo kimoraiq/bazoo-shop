@@ -213,10 +213,6 @@ const homeCategoryOrder=[
  "heaters","washing-machines","refrigerators","air-conditioners",
  "cookers","cooking-appliances","vacuum-cleaners","perfumes"
 ];
-const homeCategoryDisplayNames={
- "devices-games":"الألعاب","refrigerators":"ثلاجات",
- "air-conditioners":"السبلت","washing-machines":"الغسالات والمجففات"
-};
 function homeCategoryCollection(){
  const available=state.categories.filter(c=>c.parent_id&&c.active&&c.show_on_home!==false&&categoryChain(c.id).every(parent=>parent.active));
  const categoryBySlug=new Map(available.map(c=>[c.slug,c]));
@@ -238,7 +234,7 @@ function homeCategoryTile(item,position){
   const visual=cover?'<img class="bazoo-category-image" src="'+cover+'" alt="العروض المميزة" loading="lazy" decoding="async">':'<span class="bazoo-offer-logo"><span class="bazoo-offer-mark">BAZOO</span><strong>عروض</strong><small>مميزة</small></span>';
   return '<a class="bazoo-category-tile bazoo-category-offers" href="#/offers" aria-label="العروض المميزة" data-position="'+position+'"><span class="bazoo-category-circle">'+visual+'</span><strong class="bazoo-category-title">العروض المميزة</strong></a>';
  }
- const display=homeCategoryDisplayNames[item.slug]||item.name;
+ const display=item.name;
  return '<a class="bazoo-category-tile" href="#/categories/'+encodeURIComponent(item.id)+'" data-category-id="'+item.id+'" data-parent-id="'+esc(item.parent_id??"")+'" data-position="'+position+'" aria-label="تسوق '+esc(display)+'"><span class="bazoo-category-circle">'+categoryPhoto(item)+'</span><strong class="bazoo-category-title">'+esc(display)+'</strong></a>';
 }
 function categoryCircles(){
@@ -668,6 +664,37 @@ document.addEventListener("submit",async e=>{
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",()=>{if(!pendingScroll)pendingScroll="#app";render()});
+// Keep category titles and images in sync when an editor changes them in another tab.
+let lastCategorySyncAt=Date.now(),categorySyncInFlight=false;
+async function syncCategoriesFromDatabase(force=false){
+ if(categorySyncInFlight||(!force&&Date.now()-lastCategorySyncAt<3500))return;
+ categorySyncInFlight=true;lastCategorySyncAt=Date.now();
+ try{
+  const [categories,offer]=await Promise.all([
+   sb.from("categories").select("*").order("sort_order"),
+   sb.from("storefront_settings").select("key,image_url").eq("key","offers_category_cover")
+  ]);
+  if(categories.error)throw Error(categories.error.message);
+  if(offer.error)throw Error(offer.error.message);
+  const oldCategoryKey=JSON.stringify(state.categories);
+  const newCategoryKey=JSON.stringify(categories.data||[]);
+  const oldOfferKey=JSON.stringify(state.offersCategoryCover);
+  const newOfferKey=JSON.stringify(offer.data||[]);
+  if(oldCategoryKey===newCategoryKey&&oldOfferKey===newOfferKey)return;
+  state.categories=categories.data||[];
+  state.offersCategoryCover=offer.data||[];
+  renderCategoryNav();
+  if(["home","categories","offers"].includes(state.route))await render();
+ }catch(error){console.warn("BAZOO category sync:",error)}
+ finally{categorySyncInFlight=false}
+}
+window.addEventListener("storage",event=>{
+ if(event.key==="bazoo_catalog_revision")void syncCategoriesFromDatabase(true);
+});
+window.addEventListener("focus",()=>void syncCategoriesFromDatabase());
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden)void syncCategoriesFromDatabase();
+});
 setInterval(()=>{if(state.route!=="home"||document.hidden||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;const hero=$("#heroSlider");if(!hero)return;state.promoIndex=(state.promoIndex+1)%storefrontSlides().length;hero.innerHTML=drawHero();hero.className="merch-slider alt-"+(state.promoIndex%3)},7000);
 sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(async()=>{await refreshAuth();if(["account","admin","checkout"].includes(state.route))render()},0)}});
 persist();
