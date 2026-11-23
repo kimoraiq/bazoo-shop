@@ -44,6 +44,27 @@ assert.equal(visible[1].slug,"phones");
 assert.ok(!visible.some(x=>!x.isOffer&&!x.parent_id),"Root categories must never appear in child-category galleries");
 assert.equal(visible[14].slug,"vacuum-cleaners","original child-category sequence must remain intact");
 assert.ok(visible.some(x=>x.slug==="devices-games"),"Games category must now appear with the rest");
+
+// Regression: categories renamed in the admin must display that exact database name in both views.
+assert.doesNotMatch(app,/homeCategoryDisplayNames/,"storefront must not override edited category names");
+assert.doesNotMatch(admin,/HOME_CATEGORY_LABELS/,"admin cards must not hide the real database names");
+assert.match(app,/const display=item.name;/,"storefront must read category title from live record");
+assert.match(admin,/const title=item.name;/,"admin card must read title from live record");
+const renamed=rows.find(x=>x.slug==="air-conditioners");
+renamed.name="سبالت ومكيفات حديثة";
+const updated=getHomepage(rows).find(x=>x.slug==="air-conditioners");
+assert.equal(updated.name,"سبالت ومكيفات حديثة","name changes must flow into homepage catalog data");
+const tileSource=extract(app,"function homeCategoryTile(","function categoryCircles(");
+const tileFactory=new Function("safeImg","esc","categoryPhoto",tileSource+"\nreturn homeCategoryTile;");
+const tile=tileFactory(x=>String(x),x=>String(x),()=>"<img>");
+const rendered=tile(updated,0);
+assert.match(rendered,/سبالت ومكيفات حديثة/,"storefront tile must show the renamed category");
+assert.doesNotMatch(rendered,/>السبلت</,"old hard-coded name must not override updated DB name");
+assert.match(app,/window.addEventListener\("storage"/,"storefront must listen for admin-save notifications");
+assert.match(app,/window.addEventListener\("focus"/,"storefront must refresh on returning to browser tab");
+assert.match(app,/visibilitychange/,"storefront must refresh when reopened");
+assert.match(admin,/bazoo_catalog_revision/,"admin must notify other tabs after verified saves");
+
 assert.match(admin,/category-extra-details/,"Parent and child relations must remain manageable in admin");
 assert.match(admin,/id="homeCategoryAdminGrid"/,"Primary photo grid must have its own stable container");
 assert.match(admin,/id="categoryManagerGroups"/,"All category parent relationships must remain editable");
