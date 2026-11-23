@@ -59,6 +59,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1038,7 +1043,7 @@ const icon=(name,size=20,cls="")=>'<svg class="svg-icon '+cls+'" width="'+size+'
 const placeholder='<div class="placeholder"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#image"></use></svg></div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",section:"",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
+const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],offersCategoryCover:null,cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",section:"",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -1247,7 +1252,7 @@ const homeCategoryDisplayNames={
  "air-conditioners":"السبلت","washing-machines":"الغسالات والمجففات"
 };
 function homeCategoryCollection(){
- const available=state.categories.filter(c=>c.active&&c.show_on_home!==false&&categoryChain(c.id).every(parent=>parent.active));
+ const available=state.categories.filter(c=>c.parent_id&&c.active&&c.show_on_home!==false&&categoryChain(c.id).every(parent=>parent.active));
  const categoryBySlug=new Map(available.map(c=>[c.slug,c]));
  const curated=homeCategoryOrder.map(slug=>slug==="offers"?{slug,isOffer:true}:categoryBySlug.get(slug)).filter(Boolean);
  const pinned=new Set(homeCategoryOrder);
@@ -1263,7 +1268,7 @@ function homeCategoryCollection(){
 function homeCategoryTile(item,position){
  if(item.isOffer){
   const promo=state.promos.find(p=>p.active&&(p.desktop_image_url||p.image_url));
-  const cover=safeImg(promo?.desktop_image_url||promo?.image_url);
+  const cover=safeImg(state.offersCategoryCover?.[0]?.image_url)||safeImg(promo?.desktop_image_url||promo?.image_url);
   const visual=cover?'<img class="bazoo-category-image" src="'+cover+'" alt="العروض المميزة" loading="lazy" decoding="async">':'<span class="bazoo-offer-logo"><span class="bazoo-offer-mark">BAZOO</span><strong>عروض</strong><small>مميزة</small></span>';
   return '<a class="bazoo-category-tile bazoo-category-offers" href="#/offers" aria-label="العروض المميزة" data-position="'+position+'"><span class="bazoo-category-circle">'+visual+'</span><strong class="bazoo-category-title">العروض المميزة</strong></a>';
  }
@@ -1509,7 +1514,8 @@ async function loadCatalog(){
   ["products",()=>sb.from("products").select("*").order("created_at",{ascending:false})],
   ["productImages",()=>sb.from("product_images").select("*").order("sort_order")],
   ["rates",()=>sb.from("shipping_rates").select("*").order("governorate")],
-  ["promos",()=>sb.from("promotions").select("*").order("sort_order")]
+  ["promos",()=>sb.from("promotions").select("*").order("sort_order")],
+  ["offersCategoryCover",()=>sb.from("storefront_settings").select("key,image_url").eq("key","offers_category_cover")]
  ];
  const results=await Promise.allSettled(requests.map(async ([name,request])=>{
   const result=await request();
