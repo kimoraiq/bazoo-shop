@@ -534,6 +534,9 @@ async function render(){
    state.section=root?String(root.id):"";
    state.category=selected.parent_id?String(selected.id):"";
   }else{state.section="";state.category="";}
+ }else if(route==="categories"){
+  // Returning to the unfiltered catalog (including browser Back) clears stale section/child choices.
+  state.section="";state.category="";
  }
  if(route==="admin"){window.location.replace("./admin.html");return;}
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
