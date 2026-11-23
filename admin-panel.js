@@ -8,10 +8,13 @@ const safeUrl=url=>/^https:\/\//i.test(String(url||""))?html(url):"";
 const SCOPE={overview:"لوحة التحكم",products:"المنتجات",orders:"الطلبات",shipping:"التوصيل",promos:"الإعلانات",categories:"الفئات",brands:"العلامات التجارية",members:"المسؤولون"};
 const ICON={overview:"home",products:"package",orders:"clipboard",shipping:"truck",promos:"sparkles",categories:"grid",brands:"tag",members:"user-round"};
 const STATUS={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
-const state={user:null,role:null,permissions:{},tab:"products",records:{},busy:false,loading:false,adminVerified:false,draftKey:"",categorySearch:"",categoryMissingOnly:false};
+const state={user:null,role:null,permissions:{},tab:"products",records:{},busy:false,loading:false,adminVerified:false,draftKey:"",categorySearch:"",categoryMissingOnly:false,categoryExtrasOpen:false};
 let bootPromise=null;
 function glyph(name,cls="ui-icon"){return '<svg class="'+cls+'" aria-hidden="true"><use href="./icons.svg#'+name+'"></use></svg>'}
 const ICON_ACTION={edit:"settings",new:"plus",toggle:"eye",delete:"x",close:"x"};
+const HOME_CATEGORY_ORDER=["offers","phones","screens","tablets","devices-games","laptops","headphones","smart-watches","heaters","washing-machines","refrigerators","air-conditioners","cookers","cooking-appliances","vacuum-cleaners","perfumes"];
+const HOME_CATEGORY_LABELS={"devices-games":"الألعاب","refrigerators":"ثلاجات","air-conditioners":"السبلت","washing-machines":"الغسالات والمجففات"};
+
 const SUBTITLE={overview:"تابع أداء المتجر، واختصر وقت الإدارة من مساحة عمل واحدة.",products:"كل منتجات بازو وأسعارها ومخزونها في مكان واحد.",orders:"تابع كل طلب وغيّر حالة الطلب أو المنتج بسهولة.",shipping:"تحكّم في أجور التوصيل وتوفّر الخدمة لكل محافظة.",promos:"أنشئ لافتات جذابة ووحّد تجربة التسوّق.",categories:"رتّب أقسام المتجر وخصّص تجربة تصفّح المنتجات.",brands:"نظّم العلامات التجارية المتاحة في بازو.",members:"امنح فريقك الصلاحيات اللازمة بدون تعريض بيانات المتجر للخطر."};
 function alertUser(message,type="error"){
  const node=byId("alert");
@@ -226,6 +229,30 @@ function categoryCard(category,rows,isRoot=false){
  '<button type="button" class="category-edit-button" data-action="edit" data-table="categories" data-id="'+html(category.id)+'">'+glyph("settings")+'تعديل</button>'+
  '</div></article>';
 }
+function homepageCategoryRecords(rows){
+ return HOME_CATEGORY_ORDER.map((slug,position)=>{
+  if(slug==="offers")return {slug,position,isOffer:true,name:"العروض المميزة"};
+  const row=rows.find(category=>category.slug===slug);
+  if(!row||!row.active||row.show_on_home===false||categoryAncestors(row,rows).some(parent=>!parent.active))return null;
+  return {...row,position,isOffer:false};
+ }).filter(Boolean);
+}
+function homepageCategoryCard(item,rows){
+ if(item.isOffer)return '<article class="home-category-admin-card offer-category-admin" data-home-position="'+item.position+'">'+
+  '<div class="home-category-admin-image offer-image">'+glyph("sparkles")+'<b>BAZOO</b></div>'+
+  '<span class="home-category-admin-position">رقم '+(item.position+1)+' بالرئيسية</span>'+
+  '<h3>العروض المميزة</h3><p>الصورة تُدار من قسم الإعلانات</p>'+
+  '<div class="home-category-admin-actions"><button class="category-edit-button" type="button" data-tab="promos">'+glyph("settings")+'إدارة العروض</button></div></article>';
+ const title=HOME_CATEGORY_LABELS[item.slug]||item.name;
+ const parent=categoryAncestors(item,rows).at(-1);
+ return '<article class="home-category-admin-card" data-home-position="'+item.position+'" data-category-id="'+html(item.id)+'">'+
+ '<div class="home-category-admin-image">'+categoryImageBlock(item)+'</div>'+
+ '<span class="home-category-admin-position">رقم '+(item.position+1)+' بالرئيسية</span>'+
+ '<h3>'+html(title)+'</h3>'+
+ '<p>'+html(parent?"تابعة لـ "+parent.name:"قسم مستقل")+'</p>'+
+ '<div class="home-category-admin-actions">'+categoryUploadControl(item)+
+ '<button class="category-edit-button" type="button" data-action="edit" data-table="categories" data-id="'+html(item.id)+'">'+glyph("settings")+'تعديل</button></div></article>';
+}
 function categorySortValue(category,rows){
  const branch=[...categoryAncestors(category,rows),category];
  return branch.map(x=>String(x.sort_order??0).padStart(5,"0")).join(".")+"."+String(category.name);
@@ -238,7 +265,8 @@ function categoryManagerGroups(){
  const missingOnly=state.categoryMissingOnly;
  let count=0;
  const groups=roots.map(root=>{
-  const descendants=rows.filter(c=>String(c.id)!==String(root.id)&&categoryAncestors(c,rows).some(x=>String(x.id)===String(root.id)));
+  const shownIds=new Set(homepageCategoryRecords(rows).filter(x=>!x.isOffer).map(x=>String(x.id)));
+  const descendants=rows.filter(c=>String(c.id)!==String(root.id)&&!shownIds.has(String(c.id))&&categoryAncestors(c,rows).some(x=>String(x.id)===String(root.id)));
   descendants.sort((a,b)=>categorySortValue(a,rows).localeCompare(categorySortValue(b,rows),"ar"));
   const rootMatches=!query||[root.name,root.slug].some(v=>String(v||"").toLocaleLowerCase("ar").includes(query));
   const matched=descendants.filter(c=>
