@@ -366,8 +366,8 @@ function showProduct(id){
   '<input type="hidden" name="id" value="'+html(p.id||"")+'">'+formFooter("حفظ المنتج")
  ),"product:"+String(p.id||"new"));
 }
-function showTaxonomy(table,id){
- const p=id?findRecord(table,id):{};
+function showTaxonomy(table,id,parentId=null){
+ const p=id?findRecord(table,id):(parentId?{parent_id:parentId}:{});
  const cat=table==="categories";
  const rows=state.records.categories||[];
  const eligible=rows.filter(x=>String(x.id)!==String(p.id)&&!categoryAncestors(x,rows).some(a=>String(a.id)===String(p.id)));
@@ -505,6 +505,35 @@ async function saveProduct(form){
   }
  }catch(err){throw Error("تم حفظ بيانات المنتج في قاعدة البيانات، لكن تعذّر إكمال الصور: "+err.message)}
  return "تم حفظ المنتج والتحقق من بياناته في قاعدة البيانات.";
+}
+async function saveCategoryImage(input){
+ if(!can("categories"))throw Error("هذه الصلاحية غير مفعّلة لحسابك.");
+ const id=String(input.dataset.categoryId||"");
+ const category=findRecord("categories",id);
+ if(!category.id)throw Error("الفئة المحددة غير موجودة، حدّث البيانات.");
+ const image=input.files?.[0];
+ if(!image)return "";
+ if(input.dataset.pending==="true")return "";
+ input.dataset.pending="true";
+ const picker=input.closest(".category-upload-button");
+ if(picker)picker.classList.add("is-uploading");
+ const card=input.closest(".category-manager-card");
+ if(card)card.classList.add("is-saving");
+ try{
+  clearAlert();
+  const url=await upload(image,"product-images","categories",15360,650,650);
+  if(!url)throw Error("تعذّر قراءة الصورة المحددة.");
+  // Save only the image: do not overwrite the category name, hierarchy or home visibility.
+  await requestSave("categories",{image_url:url},id);
+  alertUser("تم رفع صورة «"+category.name+"» وحفظها بنجاح.","success");
+  await reload();
+  return url;
+ }finally{
+  input.dataset.pending="false";
+  if(picker)picker.classList.remove("is-uploading");
+  if(card)card.classList.remove("is-saving");
+  input.value="";
+ }
 }
 async function saveTaxonomy(form){
  const f=new FormData(form),table=String(f.get("table")),id=String(f.get("id")||"");
@@ -679,6 +708,12 @@ async function onSubmit(event){
 }
 document.addEventListener("submit",onSubmit,true);
 document.addEventListener("input",event=>{
+ if(event.target.id==="categoryManagerSearch"){
+  state.categorySearch=String(event.target.value||"");
+  const container=byId("categoryManagerGroups");
+  if(container)container.innerHTML=categoryManagerGroups();
+  return;
+ }
  if(event.target.id==="productSearch"){
   const term=String(event.target.value||"").trim().toLowerCase();
   for(const row of document.querySelectorAll(".data-table tbody tr[data-filter-text]"))row.hidden=!!term&&!row.dataset.filterText.includes(term);
@@ -699,6 +734,17 @@ function updateFilePreview(input){
 
 document.addEventListener("change",async event=>{
  const control=event.target;
+ if(control.id==="categoryMissingOnly"){
+  state.categoryMissingOnly=Boolean(control.checked);
+  const container=byId("categoryManagerGroups");
+  if(container)container.innerHTML=categoryManagerGroups();
+  return;
+ }
+ if(control.matches?.(".category-photo-input")){
+  try{await saveCategoryImage(control)}
+  catch(error){console.error("BAZOO category photo",error);alertUser("تعذّر حفظ الصورة: "+(error?.message||"خطأ غير معروف"))}
+  return;
+ }
  if(!control.matches(".order-status,.order-item-status")){
   if(control.type==="file"&&control.closest("#dialogBody"))updateFilePreview(control);
   if(control.closest("#dialogBody form"))saveDraft();return
@@ -723,6 +769,10 @@ document.addEventListener("click",async event=>{
  }
  const actionName=node.dataset.action,table=node.dataset.table,id=node.dataset.id;
  if(actionName==="close"){closeDialog();return}
+ if(actionName==="new-category-child"){
+  if(!can("categories"))return alertUser("هذه الصلاحية غير مفعّلة.");
+  showTaxonomy("categories",null,id);return;
+ }
  if(actionName==="new"||actionName==="edit"){
   if(table==="products")showProduct(actionName==="new"?null:id);
   else if(table==="promotions")showPromo(actionName==="new"?null:id);
