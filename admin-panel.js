@@ -155,7 +155,7 @@ async function reload(){
 function action(kind,table,id,label,cls="secondary"){return '<button type="button" class="button mini '+cls+'" data-action="'+kind+'" data-table="'+table+'" data-id="'+html(id)+'">'+glyph(ICON_ACTION[kind]||"settings")+label+'</button>'}
 function imageCell(url){return url&&safeUrl(url)?'<img class="image-thumb" src="'+safeUrl(url)+'" alt="صورة المنتج" loading="lazy">':'—'}
 function productRows(){
- return (state.records.products||[]).map(p=>'<tr data-filter-text="'+html((p.name+" "+(p.sku||"")).toLowerCase())+'"><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
+ return (state.records.products||[]).map(p=>'<tr data-filter-text="'+html((p.name+" "+(p.sku||"")).toLowerCase())+'"><td>'+imageCell(p.image_url)+'</td><td><strong>'+html(p.name)+'</strong>'+(p.is_demo?'<span class="tag demo-product-label">تجريبي</span>':'')+'<div class="help">'+html(p.sku||"بدون رمز")+'</div></td><td>'+money(p.price_iqd)+(p.compare_at_iqd>p.price_iqd?'<div class="help"><del>'+money(p.compare_at_iqd)+'</del></div>':'')+'</td><td>'+html(p.stock)+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"منشور":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit","products",p.id,"تعديل")+action("toggle","products",p.id,p.active?"إخفاء":"نشر")+action("delete","products",p.id,"حذف","danger")+'</div></td></tr>').join("");
 }
 function table(columns,body){return '<div class="surface table-wrap"><table class="data-table"><thead><tr>'+columns.map(x=>'<th>'+x+'</th>').join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>'}
 function statCard(label,num,ico,note=""){
@@ -184,12 +184,22 @@ function renderOverview(){
  +'<div class="section-head"><div><h2>اختصارات الإدارة</h2><p>انتقل مباشرة إلى القسم المطلوب</p></div></div>'
  +'<div class="overview-actions">'+links.map(([key,label,desc,ico])=>'<button class="overview-link" type="button" data-tab="'+key+'"><span class="overview-link-icon">'+glyph(ico)+'</span><span><strong>'+label+'</strong><small>'+desc+'</small></span><span class="link-arrow">'+glyph("arrow-left")+'</span></button>').join("")+'</div>';
 }
+function demoManagerPanel(rows){
+ const total=rows.filter(p=>p.is_demo===true).length;
+ return '<section class="demo-manager-panel" aria-label="إدارة المنتجات التجريبية">'+
+ '<div class="demo-manager-copy"><span class="demo-manager-icon">'+glyph("flask-conical")+'</span>'+
+ '<div><strong>منتجات البريفيو التجريبية</strong>'+
+ '<p>يوجد <b>'+total+'</b> منتج تجريبي. يمكنك معاينتها بالموقع، ثم حذف جميعها دفعة واحدة دون المساس بمنتجاتك الأصلية.</p></div></div>'+
+ '<button type="button" class="button danger demo-delete-button" data-action="delete-demo-products" '+(total?'':'disabled')+'>'+
+ glyph("trash-2")+'حذف جميع المنتجات التجريبية'+(total?' ('+total+')':'')+'</button></section>';
+}
 function renderProducts(){
  const rows=state.records.products||[];
  return '<div class="cards">'+statCard("إجمالي المنتجات",rows.length,"package","كل المنتجات المسجلة")
  +statCard("المنتجات المنشورة",rows.filter(x=>x.active).length,"check-circle","تظهر في المتجر")
  +statCard("المنتجات المخفية",rows.filter(x=>!x.active).length,"eye-off","غير ظاهرة للعملاء")
  +statCard("العروض الحالية",rows.filter(x=>x.on_sale).length,"percent","منتجات ضمن العروض")+'</div>'
+ +demoManagerPanel(rows)
  +'<div class="section-head"><div><h2>إدارة المنتجات</h2><p>تحكّم بالأسماء والصور والأسعار والخصومات والمخزون</p></div><div class="section-tools"><label class="search-box">'+glyph("search")+'<input type="search" class="input" id="productSearch" placeholder="ابحث عن منتج أو رمز..." aria-label="بحث في المنتجات"></label><button type="button" class="button" data-action="new" data-table="products">'+glyph("plus")+'إضافة منتج</button></div></div>'
  +table(["الصورة","الاسم","السعر","المخزون","الحالة","الإجراءات"],productRows()||'<tr><td colspan="6">لا توجد منتجات بعد.</td></tr>');
 }
@@ -712,6 +722,20 @@ async function toggleRecord(table,id){
  await verifyRow(table,"id",id,{active:expected});
  return "تم تعديل حالة النشر بنجاح والتحقق منها.";
 }
+async function deleteAllDemoProducts(){
+ if(!can("products"))throw Error("هذه العملية تتطلب صلاحية إدارة المنتجات.");
+ // Every delete is restricted to is_demo=true and never touches real products.
+ const {data:before,error:readError}=await db.from("products").select("id").eq("is_demo",true);
+ if(readError)throw Error("فشل عدّ المنتجات التجريبية: "+readError.message);
+ if(!before?.length)return "لا توجد منتجات تجريبية للحذف.";
+ const {data:removed,error:deleteError}=await db.from("products").delete().eq("is_demo",true).select("id,is_demo");
+ if(deleteError)throw Error("تعذّر حذف المنتجات التجريبية: "+deleteError.message);
+ if((removed||[]).some(row=>row.is_demo!==true))throw Error("رد حذف غير متوقع؛ تحقق من قاعدة البيانات.");
+ const {data:remaining,error:verifyError}=await db.from("products").select("id").eq("is_demo",true);
+ if(verifyError||remaining?.length)throw Error("لم يكتمل حذف المنتجات التجريبية. أعد تحميل الصفحة للتحقق.");
+ try{window.localStorage?.setItem("bazoo_catalog_revision",String(Date.now()))}catch(error){}
+ return "تم حذف "+removed.length+" منتج تجريبي من قاعدة البيانات. لم يتم المساس بالمنتجات الحقيقية.";
+}
 async function deleteRecord(table,id){
  if(table==="members"){
   if(state.role!=="owner")throw Error("هذه العملية للمالك فقط.");
@@ -884,6 +908,13 @@ document.addEventListener("click",async event=>{
  }
  const actionName=node.dataset.action,table=node.dataset.table,id=node.dataset.id;
  if(actionName==="close"){closeDialog();return}
+ if(actionName==="delete-demo-products"){
+  if(!can("products"))return alertUser("هذه الصلاحية غير مفعّلة.");
+  const count=(state.records.products||[]).filter(p=>p.is_demo===true).length;
+  if(!count)return alertUser("لا توجد منتجات تجريبية للحذف.");
+  customConfirm("سيتم حذف جميع المنتجات التجريبية ("+count+") نهائياً من المتجر. المنتجات الحقيقية لن تُحذف.",()=>deleteAllDemoProducts());
+  return;
+ }
  if(actionName==="new-category-child"){
   if(!can("categories"))return alertUser("هذه الصلاحية غير مفعّلة.");
   showTaxonomy("categories",null,id);return;
