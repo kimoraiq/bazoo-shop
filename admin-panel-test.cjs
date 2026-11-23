@@ -56,7 +56,7 @@ class FormData{
  has(k){return Object.hasOwn(this.values,k)}
 }
 const factory=new Function("createClient","document","window","sessionStorage","FormData","crypto","Image",source+
- "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent,renderTaxonomy,categoryManagerGroups,saveCategoryImage,saveOffersCategoryImage};");
+ "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent,renderTaxonomy,categoryManagerGroups,saveCategoryImage,saveOffersCategoryImage,renderProducts,deleteAllDemoProducts};");
 const admin=factory(()=>api,document,window,sessionStorage,FormData,{randomUUID:()=>"test-id"},function(){});
 function form(values,type="productForm"){
  const button={disabled:false};
@@ -143,5 +143,21 @@ function form(values,type="productForm"){
  const control={dataset:{order:"o1",current:"new"},value:"packing"};
  await admin.saveOrder(control);
  assert.equal(store.orders[0].status,"packing","order status write must persist");
+
+ // Preview products are separate records. Bulk cleanup deletes ONLY is_demo=true rows.
+ const liveProductId=store.products[0].id;
+ store.products.push({id:"demo-1",name:"منتج للمعاينة",sku:"BAZOO-PREVIEW-TEST",category_id:2,price_iqd:50000,stock:8,is_demo:true,active:true});
+ store.products.push({id:"demo-2",name:"منتج تجريبي آخر",sku:"BAZOO-PREVIEW-TEST2",category_id:2,price_iqd:75000,stock:8,is_demo:true,active:true});
+ admin.state.records.products=store.products.map(x=>({...x}));
+ const demoView=admin.renderProducts();
+ assert.match(demoView,/حذف جميع المنتجات التجريبية \(2\)/,"demo cleanup button should show the exact count");
+ assert.match(demoView,/data-action="delete-demo-products"/,"bulk deletion must be available in products tab");
+ assert.match(demoView,/demo-product-label/,"demo records must be visibly marked in admin");
+ const cleanupMessage=await admin.deleteAllDemoProducts();
+ assert.match(cleanupMessage,/تم حذف 2 منتج تجريبي/,"bulk deletion should report actual removed records");
+ assert.equal(store.products.filter(x=>x.is_demo===true).length,0,"all demo products should be deleted");
+ assert.equal(store.products.filter(x=>x.is_demo===false).length,1,"real product must be left untouched");
+ assert.equal(store.products[0].id,liveProductId,"the original genuine product must remain intact");
+
  console.log("PASS BAZOO new admin: owner verified, actual product write/readback, failed saves retained, status write verified");
 })().catch(error=>{console.error(error);process.exitCode=1});
