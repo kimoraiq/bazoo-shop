@@ -36,5 +36,5 @@ assert.match(css,/\.bazoo-category-circle \.category-thumb/,"photograph treatmen
 assert.match(css,/\.bazoo-category-scroller\{overflow-x:auto/,"mobile should horizontally scroll the full 2x8 layout");
 assert.match(html,/style\.css\?v=20261123ui41/,"stylesheet cache must be refreshed");
 assert.match(html,/bundle\.js\?v=20261123ui41/,"JavaScript cache must be refreshed");
-assert.match(adminHtml,/admin-panel\.js\?v=20261123ui41/,"management portal must remain intact");
+assert.match(adminHtml,/admin-panel\.js\?v=20261123catadmin42/,"management portal must remain intact");
 console.log("PASS BAZOO approved 2x8 layout: exact order, photo tiles, independent offers, proper category parent links and mobile");
