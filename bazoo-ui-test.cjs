@@ -97,7 +97,7 @@ const mockObserver=class{observe(){}};
 vm.runInNewContext(ui,{document,window,MutationObserver:mockObserver,Event:eventFactory,console});
 for(const f of callbacks.DOMContentLoaded||[])f();
 assert.ok(select.classList.contains("bz-native-select"),"native dropdown must be visually replaced");
-assert.equal(label.children[0].className,"bz-select");
+assert.ok(label.children[0].classList.contains("bz-select"),"select must be enclosed in a BAZOO component");
 const trigger=label.children[0].children[1];
 assert.equal(trigger.getAttribute("role"),"combobox");
 assert.equal(trigger.type,"button");
