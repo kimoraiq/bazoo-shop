@@ -217,23 +217,41 @@ const homeCategoryDisplayNames={
  "devices-games":"الألعاب","refrigerators":"ثلاجات",
  "air-conditioners":"السبلت","washing-machines":"الغسالات والمجففات"
 };
-function categoryCircles(){
- const available=state.categories.filter(c=>c.active&&c.show_on_home!==false&&categoryChain(c.id).every(ancestor=>ancestor.active));
+function homeCategoryCollection(){
+ const available=state.categories.filter(c=>c.active&&c.show_on_home!==false&&categoryChain(c.id).every(parent=>parent.active));
  const categoryBySlug=new Map(available.map(c=>[c.slug,c]));
- const tiles=homeCategoryOrder.map((slug,index)=>{
-  if(slug==="offers"){
-   const promo=state.promos.find(p=>p.active&&(p.desktop_image_url||p.image_url));
-   const cover=safeImg(promo?.desktop_image_url||promo?.image_url);
-   const visual=cover?'<img class="bazoo-category-image" src="'+cover+'" alt="العروض المميزة" loading="lazy" decoding="async">':'<span class="bazoo-offer-logo"><span class="bazoo-offer-mark">BAZOO</span><strong>عروض</strong><small>مميزة</small></span>';
-   return '<a class="bazoo-category-tile bazoo-category-offers" href="#/offers" aria-label="العروض المميزة" data-position="'+index+'"><span class="bazoo-category-circle">'+visual+'</span><strong class="bazoo-category-title">العروض المميزة</strong></a>';
-  }
-  const category=categoryBySlug.get(slug);
-  if(!category)return "";
-  const display=homeCategoryDisplayNames[slug]||category.name;
-  return '<a class="bazoo-category-tile" href="#/categories/'+encodeURIComponent(category.id)+'" data-category-id="'+category.id+'" data-parent-id="'+esc(category.parent_id??"")+'" data-position="'+index+'" aria-label="تسوق '+esc(display)+'"><span class="bazoo-category-circle">'+categoryPhoto(category)+'</span><strong class="bazoo-category-title">'+esc(display)+'</strong></a>';
- }).join("");
+ const curated=homeCategoryOrder.map(slug=>slug==="offers"?{slug,isOffer:true}:categoryBySlug.get(slug)).filter(Boolean);
+ const pinned=new Set(homeCategoryOrder);
+ const remaining=available.filter(c=>!pinned.has(c.slug)).sort((a,b)=>{
+  const aRoot=!a.parent_id,bRoot=!b.parent_id;
+  if(aRoot!==bRoot)return aRoot?-1:1;
+  const aParents=categoryChain(a.id).slice(1).map(p=>p.name).reverse().join(" / ");
+  const bParents=categoryChain(b.id).slice(1).map(p=>p.name).reverse().join(" / ");
+  return aParents.localeCompare(bParents,"ar")||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar");
+ });
+ return {curated,remaining};
+}
+function homeCategoryTile(item,position,extra=false){
+ if(item.isOffer){
+  const promo=state.promos.find(p=>p.active&&(p.desktop_image_url||p.image_url));
+  const cover=safeImg(promo?.desktop_image_url||promo?.image_url);
+  const visual=cover?'<img class="bazoo-category-image" src="'+cover+'" alt="العروض المميزة" loading="lazy" decoding="async">':'<span class="bazoo-offer-logo"><span class="bazoo-offer-mark">BAZOO</span><strong>عروض</strong><small>مميزة</small></span>';
+  return '<a class="bazoo-category-tile bazoo-category-offers" href="#/offers" aria-label="العروض المميزة" data-position="'+position+'"><span class="bazoo-category-circle">'+visual+'</span><strong class="bazoo-category-title">العروض المميزة</strong></a>';
+ }
+ const display=homeCategoryDisplayNames[item.slug]||item.name;
+ const parent=categoryChain(item.id).slice(1).at(-1);
+ const relation=extra?'<span class="bazoo-category-relation">'+(parent?"تابعة لـ "+esc(parent.name):"قسم رئيسي")+'</span>':"";
+ return '<a class="bazoo-category-tile '+(!item.parent_id?"bazoo-category-main":"")+'" href="#/categories/'+encodeURIComponent(item.id)+'" data-category-id="'+item.id+'" data-parent-id="'+esc(item.parent_id??"")+'" data-position="'+position+'" aria-label="تسوق '+esc(display)+'"><span class="bazoo-category-circle">'+categoryPhoto(item)+'</span><strong class="bazoo-category-title">'+esc(display)+'</strong>'+relation+'</a>';
+}
+function categoryCircles(){
+ const {curated,remaining}=homeCategoryCollection();
+ const tiles=curated.map((item,i)=>homeCategoryTile(item,i)).join("");
+ const extra=remaining.length?
+  '<div class="bazoo-category-extra-heading"><h3>بقية الأقسام والفئات</h3><span>'+remaining.length+' فئات وأقسام إضافية مرتبطة بالمتجر</span></div>'+
+  '<div class="bazoo-category-scroller" aria-label="بقية أقسام وفئات بازو" tabindex="0"><div class="bazoo-category-grid bazoo-category-extra-grid" role="navigation" aria-label="بقية الأقسام والفئات">'+
+  remaining.map((item,i)=>homeCategoryTile(item,curated.length+i,true)).join("")+'</div></div>':"";
  return '<div class="bazoo-category-heading"><div><span class="bazoo-category-kicker">اكتشف منتجاتنا</span><h2>تسوّق حسب الفئة</h2></div><a href="#/categories" class="bazoo-category-all">جميع الفئات '+icon("arrow-left",15)+'</a></div>'+
- '<div class="bazoo-category-scroller" aria-label="التصنيفات" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div>';
+ '<div class="bazoo-category-scroller" aria-label="التصنيفات" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div>'+extra;
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
