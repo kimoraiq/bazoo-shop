@@ -34,6 +34,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1013,7 +1018,7 @@ const icon=(name,size=20,cls="")=>'<svg class="svg-icon '+cls+'" width="'+size+'
 const placeholder='<div class="placeholder"><svg class="svg-icon" aria-hidden="true"><use href="./icons.svg#image"></use></svg></div>';
 const label={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
 const govs=["بغداد","البصرة","نينوى","أربيل","السليمانية","دهوك","صلاح الدين","الأنبار","كركوك","ديالى","بابل","كربلاء","النجف","واسط","ميسان","ذي قار","المثنى","القادسية"];
-const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
+const state={catalogFailure:false,products:[],productImages:[],categories:[],brands:[],rates:[],promos:[],cart:{},favs:[],galleryIndex:0,user:null,admin:false,adminRole:null,adminPermissions:{},authLoaded:false,authError:"",route:"home",section:"",category:"",brand:"",q:"",promoIndex:0,checkoutPending:false,selectedGovernorate:"",adminTab:"products",editProduct:null};
 try{state.cart=JSON.parse(localStorage.getItem("bazoo_cart_v2")||"{}")||{};state.favs=JSON.parse(localStorage.getItem("bazoo_favs_v2")||"[]")||[]}catch(e){}
 if(Array.isArray(state.cart)||typeof state.cart!=="object")state.cart={};
 if(!Array.isArray(state.favs))state.favs=[];
@@ -1112,7 +1117,7 @@ const activeProducts=()=>state.products.filter(p=>{
  const b=state.brands.find(x=>x.id===p.brand_id);
  return categoryChain(p.category_id).every(c=>c.active)&&(!b||b.active);
 });
-function filterProducts({category=state.category,brand=state.brand,q=state.q,onSale=false}={}){
+function filterProducts({category=state.category||state.section,brand=state.brand,q=state.q,onSale=false}={}){
  const descendants=category?descendantIds(category):null;
  return activeProducts().filter(p=>{
  const matchCat=!category||descendants.has(String(p.category_id));
@@ -1267,9 +1272,24 @@ function favoritesPage(){
  const products=activeProducts().filter(p=>state.favs.includes(p.id));
  return '<div class="page"><h1>المفضلة</h1><p class="subtle">منتجاتك المحفوظة على هذا الجهاز</p>'+productGrid(products)+'</div>';
 }
-function filters(){return '<div class="filter-panel"><label>القسم<select id="categoryFilter"><option value="">كل الأقسام</option>'+state.categories.filter(c=>c.active).map(c=>'<option value="'+c.id+'" '+(String(c.id)===String(state.category)?"selected":"")+'>'+(c.parent_id?"— ":"")+esc(c.name)+'</option>').join("")+'</select></label><label>العلامة التجارية<select id="brandFilter"><option value="">كل العلامات</option>'+state.brands.filter(b=>b.active).map(b=>'<option value="'+b.id+'" '+(String(b.id)===String(state.brand)?"selected":"")+'>'+esc(b.name)+'</option>').join("")+'</select></label><label>بحث عن منتج<input class="field" id="filterSearch" value="'+esc(state.q)+'" placeholder="اسم المنتج أو العلامة التجارية..."></label></div>'}
+function filters(){
+ const roots=state.categories.filter(c=>c.active&&!c.parent_id);
+ const root=roots.find(c=>String(c.id)===String(state.section));
+ const children=root?state.categories.filter(c=>c.active&&c.parent_id&&String(c.id)!==String(root.id)&&categoryChain(c.id).some(x=>String(x.id)===String(root.id))&&categoryChain(c.id).every(x=>x.active)):[];
+ children.sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar"));
+ const options=children.map(c=>{
+  const trail=categoryChain(c.id).slice(0,-1).reverse().filter(x=>String(x.id)!==String(root.id));
+  const name=trail.length?trail.map(x=>x.name).join(" / ")+" / "+c.name:c.name;
+  return '<option value="'+c.id+'" '+(String(c.id)===String(state.category)?'selected':'')+'>'+esc(name)+'</option>';
+ }).join("");
+ return '<div class="filter-panel bazoo-catalog-filters">'
+ +'<label>القسم الرئيسي<select id="categoryFilter" aria-label="القسم الرئيسي"><option value="">جميع الأقسام</option>'+roots.map(c=>'<option value="'+c.id+'" '+(String(c.id)===String(state.section)?'selected':'')+'>'+esc(c.name)+'</option>').join("")+'</select></label>'
+ +'<label>الفئة<select id="subcategoryFilter" aria-label="الفئة التابعة للقسم" '+(!root||!children.length?'disabled':'')+'><option value="">'+(!root?'اختر القسم أولاً':children.length?'كل فئات '+esc(root.name):'لا توجد فئات فرعية')+'</option>'+options+'</select></label>'
+ +'<label>العلامة التجارية<select id="brandFilter" aria-label="العلامة التجارية"><option value="">كل العلامات</option>'+state.brands.filter(b=>b.active).map(b=>'<option value="'+b.id+'" '+(String(b.id)===String(state.brand)?'selected':'')+'>'+esc(b.name)+'</option>').join("")+'</select></label>'
+ +'<label>بحث عن منتج<input class="field" id="filterSearch" aria-label="بحث عن منتج" value="'+esc(state.q)+'" placeholder="اسم المنتج أو العلامة التجارية..."></label></div>';
+}
 function categories(){
- const selected=state.categories.find(c=>String(c.id)===String(state.category));
+ const selected=state.categories.find(c=>String(c.id)===String(state.category||state.section));
  const childCats=selected?state.categories.filter(c=>c.active&&String(c.parent_id)===String(selected.id)):[];
  const title=selected?selected.name:"الفئات والعلامات التجارية";
  const breadcrumbs=selected?'<div class="category-breadcrumb"><a href="#/home">الرئيسية</a>'+icon("chevron-left",14)+'<a href="#/categories">جميع المنتجات</a>'+categoryChain(selected.id).reverse().map(c=>icon("chevron-left",14)+'<span>'+esc(c.name)+'</span>').join("")+'</div>':"";
@@ -1516,8 +1536,14 @@ function shippingBind(sel,ship,total){
 const {adminPage,bindAdmin,saveProduct,showPromoEditor,savePromo,saveTaxonomy,saveMember}=createAdmin({sb,state,esc,money,safeImg,loadCatalog,notify,render,openModal,closeModal,go,icon,confirmAction});
 async function render(){
  const hash=decodeURIComponent(location.hash.replace(/^#\/?/,""))||"home";const parts=hash.split("/");const route=parts[0]||"home";state.route=route;
- if(route==="categories"&&parts[1]){state.category=String(parts[1]);state.brand="";state.q=""}
- else if(route==="categories"&&location.hash==="#/categories"&&state.category&&state.route!==route){state.category=""}
+ if(route==="categories"&&parts[1]){
+  const selected=state.categories.find(c=>String(c.id)===String(parts[1]));
+  if(selected){
+   const root=categoryChain(selected.id).at(-1);
+   state.section=root?String(root.id):"";
+   state.category=selected.parent_id?String(selected.id):"";
+  }else{state.section="";state.category="";}
+ }
  if(route==="admin"){window.location.replace("./admin.html");return;}
  document.querySelectorAll("#bottomNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
  document.querySelectorAll("#categoryNav button").forEach(x=>x.classList.toggle("active",x.dataset.go===route));
@@ -1540,8 +1566,13 @@ document.addEventListener("click",async e=>{
  if(b.tagName==="A"&&b.getAttribute("href")?.startsWith("#/")){
   e.preventDefault();
   const dest=decodeURIComponent(b.getAttribute("href").slice(2));
-  if(dest.startsWith("categories/")){state.category=dest.slice("categories/".length);state.brand="";state.q="";}
-  else if(dest==="categories"){state.category="";state.brand="";state.q="";}
+  if(dest.startsWith("categories/")){
+   const selected=state.categories.find(c=>String(c.id)===dest.slice("categories/".length));
+   const root=selected?categoryChain(selected.id).at(-1):null;
+   state.section=root?String(root.id):"";
+   state.category=selected?.parent_id?String(selected.id):"";
+   state.brand="";state.q="";
+  }else if(dest==="categories"){state.section="";state.category="";state.brand="";state.q="";}
   go(dest,dest.startsWith("categories/")?"#categoryResults":"#app");
   return;
  }
@@ -1557,10 +1588,10 @@ document.addEventListener("click",async e=>{
  }
  if(b.dataset.provinceContext){openProvincePicker(b.dataset.provinceContext);return}
  if(b.dataset.pickProvince){chooseProvince(b.dataset.pickProvince,b.dataset.provinceTarget);return}
- if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();if(b.dataset.go==="admin"){await refreshAuth();if(!state.admin){notify("يرجى تسجيل الدخول بحساب مسؤول المتجر ثم إعادة المحاولة.");go("account");return}}go(b.dataset.go);return}
- if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.category=c?String(c.id):"";state.brand="";state.q="";go("categories","#catalogFilters");return}
- if(b.dataset.brand){state.brand=b.dataset.brand;state.category="";state.q="";go("categories","#catalogFilters");return}
- if(b.dataset.cat){state.category=b.dataset.cat;state.brand="";state.q="";go("categories/"+encodeURIComponent(b.dataset.cat),"#categoryResults");return}
+ if(b.dataset.go){if($("#modal").classList.contains("show"))closeModal();if(b.dataset.go==="categories"){state.section="";state.category="";state.brand="";state.q="";}if(b.dataset.go==="admin"){await refreshAuth();if(!state.admin){notify("يرجى تسجيل الدخول بحساب مسؤول المتجر ثم إعادة المحاولة.");go("account");return}}go(b.dataset.go);return}
+ if(b.dataset.mainCat){const c=state.categories.find(x=>x.slug===b.dataset.mainCat);state.section=c?String(c.id):"";state.category="";state.brand="";state.q="";go(c?"categories/"+encodeURIComponent(c.id):"categories","#catalogFilters");return}
+ if(b.dataset.brand){state.brand=b.dataset.brand;state.section="";state.category="";state.q="";go("categories","#catalogFilters");return}
+ if(b.dataset.cat){const selected=state.categories.find(c=>String(c.id)===String(b.dataset.cat));const root=selected?categoryChain(selected.id).at(-1):null;state.section=root?String(root.id):"";state.category=selected?.parent_id?String(selected.id):"";state.brand="";state.q="";go("categories/"+encodeURIComponent(b.dataset.cat),"#categoryResults");return}
  if(b.dataset.galleryIndex!==undefined){changeGallery(Number(b.dataset.galleryIndex));return}
  if(b.dataset.galleryStep){changeGallery((state.galleryIndex||0)+Number(b.dataset.galleryStep));return}
  if(b.dataset.add){add(b.dataset.add);return}
@@ -1584,7 +1615,19 @@ document.addEventListener("click",async e=>{
  if(b.dataset.editPromo){showPromoEditor(b.dataset.editPromo);return}
  if(b.id==="newPromo"){showPromoEditor("new");return}
 });
-document.addEventListener("change",e=>{if(e.target.id==="categoryFilter"){state.category=e.target.value;render()}if(e.target.id==="brandFilter"){state.brand=e.target.value;render()}});
+document.addEventListener("change",e=>{
+ if(e.target.id==="categoryFilter"){
+  state.section=e.target.value;state.category="";
+  go(state.section?"categories/"+encodeURIComponent(state.section):"categories","#catalogFilters");
+  return;
+ }
+ if(e.target.id==="subcategoryFilter"){
+  state.category=e.target.value;
+  go(state.category?"categories/"+encodeURIComponent(state.category):state.section?"categories/"+encodeURIComponent(state.section):"categories","#catalogFilters");
+  return;
+ }
+ if(e.target.id==="brandFilter"){state.brand=e.target.value;render()}
+});
 let searchDebounce;document.addEventListener("input",e=>{
  if(e.target.id==="provinceSearch"){const q=e.target.value.trim();document.querySelectorAll(".province-item").forEach(x=>x.hidden=!x.textContent.includes(q));return}
  if(e.target.id==="filterSearch"){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{state.q=e.target.value;const old=document.activeElement?.selectionStart;render();const x=$("#filterSearch");x?.focus();if(typeof old==="number")x?.setSelectionRange(old,old)},400)}});
@@ -1595,7 +1638,7 @@ document.addEventListener("submit",e=>{
 },true);
 document.addEventListener("submit",async e=>{
  const form=e.target,id=form?.id||"";
- if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.category="";state.brand="";go("categories","#categoryResults");return}
+ if(id==="searchForm"){e.preventDefault();state.q=$("#searchBox").value.trim();state.section="";state.category="";state.brand="";go("categories","#categoryResults");return}
  if(!["authForm","orderForm","adminProductForm","adminPromoForm","adminTaxonomyForm","adminMemberForm"].includes(id))return;
  e.preventDefault();
  if(form.dataset?.saveInProgress==="true")return;
