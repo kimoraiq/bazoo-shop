@@ -30,6 +30,7 @@ jobs:
           node bazoo-ui-test.cjs
           node admin-panel-test.cjs
           node category-hierarchy-test.cjs
+          node category-admin-consistency-test.cjs
           node catalog-dependent-filters-test.cjs
           node admin-brand-ui-test.cjs
           node smoke-test.cjs
