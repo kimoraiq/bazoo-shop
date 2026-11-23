@@ -4,7 +4,12 @@ let source=fs.readFileSync("admin-panel.js","utf8");
 source=source.replace('import { createClient } from "./client.js";',"");
 const store={
  products:[{id:"p1",name:"منتج قديم",category_id:2,price_iqd:100000,compare_at_iqd:null,stock:5,description:"",sku:null,brand_id:null,image_url:null,active:true,featured:false,on_sale:false,is_demo:false,specifications:{}}],
- categories:[{id:1,name:"أجهزة",parent_id:null,sort_order:0,active:true},{id:2,name:"هواتف",parent_id:1,sort_order:1,active:true}],
+ categories:[
+ {id:1,name:"أجهزة",slug:"appliances",parent_id:null,sort_order:0,active:true,show_on_home:true,image_url:null},
+ {id:2,name:"هواتف",slug:"phones",parent_id:1,sort_order:1,active:true,show_on_home:true,image_url:null},
+ {id:3,name:"قرطاسية",slug:"stationery",parent_id:null,sort_order:2,active:true,show_on_home:true,image_url:null},
+ {id:4,name:"أقلام",slug:"pens",parent_id:3,sort_order:1,active:true,show_on_home:true,image_url:null}
+],
  brands:[],product_images:[],promotions:[],shipping_rates:[{governorate:"بغداد",price_iqd:4000,enabled:true}],orders:[{id:"o1",status:"new",order_items:[{id:12,order_id:"o1",status:"new"}]}],
  order_items:[{id:12,order_id:"o1",status:"new"}]
 };
@@ -31,7 +36,10 @@ class Query{
 }
 const api={auth:{getUser:async()=>({data:{user:{id:"owner1",email:"owner@example.invalid"}},error:null})},
  rpc:async name=>name==="my_admin_access"?{data:{user_id:"owner1",role:"owner",permissions:{}},error:null}:{data:{},error:null},
- from:table=>new Query(table),storage:{from(){throw Error("Unexpected storage upload")}}};
+ from:table=>new Query(table),storage:{from(bucket){assert.equal(bucket,"product-images");return{
+  upload:async(path,blob)=>({error:null}),
+  getPublicUrl:path=>({data:{publicUrl:"https://example.invalid/storage/"+path}})
+}}}};
 const elements=new Map();
 function node(id){
  if(!elements.has(id))elements.set(id,{id,innerHTML:"",textContent:"",hidden:id==="overlay"||id==="alert",disabled:false,className:"",style:{},
@@ -47,7 +55,7 @@ class FormData{
  has(k){return Object.hasOwn(this.values,k)}
 }
 const factory=new Function("createClient","document","window","sessionStorage","FormData","crypto","Image",source+
- "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent};");
+ "\nreturn {bootPromise,state,onSubmit,saveOrder,renderContent,renderTaxonomy,categoryManagerGroups,saveCategoryImage};");
 const admin=factory(()=>api,document,window,sessionStorage,FormData,{randomUUID:()=>"test-id"},function(){});
 function form(values,type="productForm"){
  const button={disabled:false};
@@ -90,6 +98,29 @@ function form(values,type="productForm"){
  assert.equal(store.categories[0].name,"الأجهزة الكهربائية","category editing must persist");
  assert.match(node("alert").textContent,/تم حفظ التصنيف/,"category editor must reach the database");
  assert.equal(node("alert").className,"alert success");
+ // A parent category and its children must be grouped and each card should expose a direct upload.
+ const grouped=admin.renderTaxonomy("categories");
+ assert.match(grouped,/صور الفئات والأقسام/,"category view should be easy to find");
+ assert.match(grouped,/data-parent-category="1"/,"root Appliances category should form a separate group");
+ assert.match(grouped,/data-parent-category="3"/,"root Stationery category should form a separate group");
+ assert.match(grouped,/data-category-id="2"/,"phone category should have a direct image picker");
+ assert.match(grouped,/data-category-id="4"/,"pen category should have a direct image picker");
+ assert.match(grouped,/الفئات التي تحتاج صور فقط/,"missing-image filter should be visible");
+ assert.match(grouped,/category-photo-input/,"upload button must be directly on each category card");
+ assert.ok(grouped.indexOf('data-parent-category="1"')<grouped.indexOf('data-parent-category="3"'));
+ // Uploading the phone picture updates only its image URL and verifies its DB value.
+ const imageFile={size:4096,type:"image/webp",name:"phones.webp"};
+ const cls={add(){},remove(){}};
+ const picker={classList:cls};
+ const card={classList:cls};
+ const direct={dataset:{categoryId:"2"},files:[imageFile],value:"",closest:sel=>sel===".category-upload-button"?picker:card};
+ const url=await admin.saveCategoryImage(direct);
+ assert.ok(url.includes("categories/test-id.webp"),"real storage path must be generated");
+ assert.equal(store.categories[1].image_url,url,"image must be persisted on the correct child category");
+ assert.equal(store.categories[1].parent_id,1,"quick image upload must not change parent hierarchy");
+ assert.equal(store.categories[1].name,"هواتف","quick image upload must not rename the category");
+ assert.equal(store.categories[3].image_url,null,"other category images must not be affected");
+ assert.match(node("alert").textContent,/تم رفع صورة/);
  // Promo editor also has a hidden id field and must not be rejected.
  const promo=form({id:"",title:"عرض خاص",subtitle:"خصم",placement:"home",link_url:"#/offers",product_id:"p1",sort_order:"0",active:"true",artwork_only:"true",is_demo:"false"},"promoForm");
  await admin.onSubmit({target:promo,preventDefault(){},stopPropagation(){}});
