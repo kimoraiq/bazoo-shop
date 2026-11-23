@@ -79,6 +79,11 @@
  * Eliminates the third-party JS CDN dependency.
  * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
  */
+/**
+ * BAZOO minimal native Supabase HTTP client.
+ * Eliminates the third-party JS CDN dependency.
+ * Uses Supabase Auth, PostgREST, RPC and Storage with the publishable key only.
+ */
 function createClient(baseUrl, publishableKey) {
   const base=String(baseUrl).replace(/\/$/,"");
   const storageKey="bazoo-auth-session";
@@ -1292,12 +1297,82 @@ function categoryCircles(){
  const {curated,remaining}=homeCategoryCollection();
  const tiles=[...curated,...remaining].map((item,i)=>homeCategoryTile(item,i)).join("");
  return '<div class="bazoo-category-heading"><div><span class="bazoo-category-kicker">اكتشف منتجاتنا</span><h2>تسوّق حسب الفئة</h2></div>'+
- '<div class="bazoo-category-heading-actions"><span class="bazoo-category-scroll-hint">اسحب لاستعراض بقية الفئات</span>'+
+ '<div class="bazoo-category-heading-actions"><span class="bazoo-category-scroll-hint">اسحب لتكتشف المزيد</span>'+
  '<div class="bazoo-category-scroll-controls" role="group" aria-label="تحريك الفئات">'+
- '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="1" aria-label="تحريك الفئات نحو اليمين">'+icon("chevron-right",18)+'</button>'+
- '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="-1" aria-label="تحريك الفئات نحو اليسار">'+icon("chevron-left",18)+'</button></div>'+
+ '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="1" aria-controls="bazooCategoryScroller" aria-label="تحريك الفئات نحو اليمين">'+icon("chevron-right",18)+'</button>'+
+ '<button type="button" class="bazoo-category-scroll-arrow" data-category-scroll="-1" aria-controls="bazooCategoryScroller" aria-label="تحريك الفئات نحو اليسار">'+icon("chevron-left",18)+'</button></div>'+
  '<a href="#/categories" class="bazoo-category-all">جميع الفئات '+icon("arrow-left",15)+'</a></div></div>'+
- '<div class="bazoo-category-scroller" dir="rtl" aria-label="الفئات في صفين، اسحب يميناً ويساراً لاستعراض المزيد" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div>';
+ '<div class="bazoo-category-frame"><div class="bazoo-category-scroller" dir="rtl" id="bazooCategoryScroller" aria-label="الفئات في صفين، اسحب يميناً ويساراً لاستعراض المزيد" tabindex="0"><div class="bazoo-category-grid" role="navigation" aria-label="تسوّق حسب الفئة">'+tiles+'</div></div></div>'+
+ '<div class="bazoo-category-footer"><div class="bazoo-category-scroll-progress" role="progressbar" aria-label="تقدم استعراض الفئات" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bazoo-category-scroll-thumb"></span></div><span class="bazoo-category-page-count" aria-label="رقم صفحة الفئات">1 / 1</span></div>';
+}
+// BAZOO category carousel: accurate RTL bounds, progress, touch-native swipe and mouse drag.
+function categoryCarouselStep(rail){return Math.max(200,Math.round(rail.clientWidth*.78))}
+function updateCategoryCarousel(rail){
+ if(!rail?.isConnected)return;
+ const section=rail.closest(".bazoo-category-explorer");
+ if(!section)return;
+ const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+ // Modern RTL scrollLeft starts at 0 and becomes negative as the user moves left.
+ const position=Math.max(0,Math.min(max,-rail.scrollLeft));
+ const progress=max>1?position/max:0;
+ const hasMore=max>4;
+ section.classList.toggle("has-scroll-left",hasMore&&position<max-2);
+ section.classList.toggle("has-scroll-right",hasMore&&position>2);
+ section.classList.toggle("no-category-overflow",!hasMore);
+ const left=section.querySelector('[data-category-scroll="-1"]');
+ const right=section.querySelector('[data-category-scroll="1"]');
+ if(left)left.disabled=!hasMore||position>=max-2;
+ if(right)right.disabled=!hasMore||position<=2;
+ const bar=section.querySelector(".bazoo-category-scroll-progress");
+ if(bar){
+  bar.setAttribute("aria-valuenow",String(Math.round(progress*100)));
+  const thumb=bar.querySelector(".bazoo-category-scroll-thumb");
+  if(thumb)thumb.style.right=(progress*82).toFixed(2)+"%";
+ }
+ const pages=Math.max(1,Math.ceil(max/categoryCarouselStep(rail))+1);
+ const current=Math.min(pages,Math.floor((position+1)/categoryCarouselStep(rail))+1);
+ const count=section.querySelector(".bazoo-category-page-count");
+ if(count)count.textContent=current+" / "+pages;
+}
+function initCategoryCarousel(){
+ const rail=document.querySelector("#bazooCategoryScroller");
+ if(!rail)return;
+ updateCategoryCarousel(rail);
+ rail.addEventListener("scroll",()=>updateCategoryCarousel(rail),{passive:true});
+ rail.addEventListener("keydown",event=>{
+  if(event.target!==rail||!["ArrowLeft","ArrowRight"].includes(event.key))return;
+  event.preventDefault();
+  const direction=event.key==="ArrowLeft"?-1:1;
+  const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  rail.scrollBy({left:direction*categoryCarouselStep(rail),behavior:reduced?"auto":"smooth"});
+ });
+ // Mouse-only drag on laptop/desktop; touch devices retain native momentum scrolling.
+ let drag=null,suppressClick=false;
+ rail.addEventListener("pointerdown",event=>{
+  if(event.pointerType!=="mouse"||event.button!==0)return;
+  drag={x:event.clientX,scroll:rail.scrollLeft,active:false};
+  suppressClick=false;
+ });
+ rail.addEventListener("pointermove",event=>{
+  if(!drag||event.pointerType!=="mouse")return;
+  const dx=event.clientX-drag.x;
+  if(!drag.active&&Math.abs(dx)<7)return;
+  if(!drag.active){
+   drag.active=true;
+   rail.classList.add("is-dragging");
+  }
+  rail.scrollLeft=drag.scroll+dx;
+  event.preventDefault();
+ });
+ const endDrag=()=>{if(!drag)return;suppressClick=drag.active;drag=null;rail.classList.remove("is-dragging")};
+ rail.addEventListener("pointerup",endDrag);
+ rail.addEventListener("pointercancel",endDrag);
+ rail.addEventListener("pointerleave",endDrag);
+ rail.addEventListener("click",event=>{
+  if(!suppressClick)return;
+  suppressClick=false;event.preventDefault();event.stopPropagation();
+ },true);
+ rail.addEventListener("dragstart",event=>event.preventDefault());
 }
 function homeEmpty(title,description,iconName="package"){
  return '<div class="home-empty"><div><h3>'+esc(title)+'</h3><p>'+esc(description)+'</p></div><span class="home-empty-icon">'+icon(iconName,40)+'</span></div>';
@@ -1620,6 +1695,7 @@ async function render(){
  if(state.route!==route)return;
  if(state.catalogFailure)content='<div class="connection-notice" role="alert">'+icon("circle-alert",20)+' <span>تعذّر الاتصال بقاعدة بيانات بازو. تأكد من الإنترنت ثم أعد المحاولة.</span> <button class="btn outline" id="retryCatalog">'+icon("refresh",16)+' إعادة المحاولة</button></div>'+content;
  $("#app").innerHTML=content;$("#app").querySelectorAll("form").forEach(f=>f.noValidate=true);
+ if(route==="home")initCategoryCarousel();
  if(pendingScroll){const destination=pendingScroll;pendingScroll=null;scrollToContent(destination)}
  if(route==="cart"){const g=$("#cartGovernorate");if(g){g.value=state.selectedGovernorate;g.addEventListener("change",()=>state.selectedGovernorate=g.value);}shippingBind("#cartGovernorate","#shippingPrice","#grandTotal");if(g)g.dispatchEvent(new Event("change"))}
  if(route==="checkout"){const g=$("#orderGovernorate");if(g)g.value=state.selectedGovernorate;shippingBind("#orderGovernorate","#checkoutShip","#checkoutTotal");g?.dispatchEvent(new Event("change"))}
@@ -1641,11 +1717,10 @@ document.addEventListener("click",async e=>{
   return;
  }
  if(b.dataset.categoryScroll){
-  const rail=document.querySelector(".bazoo-category-scroller");
+  const rail=document.querySelector("#bazooCategoryScroller");
   if(rail){
-   const step=Math.max(220,Math.round(rail.clientWidth*.72));
    const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-   rail.scrollBy({left:Number(b.dataset.categoryScroll)*step,behavior:reduced?"auto":"smooth"});
+   rail.scrollBy({left:Number(b.dataset.categoryScroll)*categoryCarouselStep(rail),behavior:reduced?"auto":"smooth"});
   }
   return;
  }
@@ -1732,6 +1807,7 @@ document.addEventListener("submit",async e=>{
 $("#accountBtn").onclick=()=>go("account");$("#cartBtn").onclick=()=>go("cart");$("#favoritesBtn").onclick=()=>go("favorites");$("#year").textContent=new Date().getFullYear();
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.dataset.detail){e.preventDefault();detail(e.target.dataset.detail)}});
 window.addEventListener("hashchange",()=>{if(!pendingScroll)pendingScroll="#app";render()});
+window.addEventListener("resize",()=>updateCategoryCarousel(document.querySelector("#bazooCategoryScroller")));
 // Keep category titles and images in sync when an editor changes them in another tab.
 let lastCategorySyncAt=Date.now(),categorySyncInFlight=false;
 async function syncCategoriesFromDatabase(force=false){
