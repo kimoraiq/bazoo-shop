@@ -701,3 +701,38 @@ label.field textarea {resize:vertical;min-height:90px}
 @media(max-width:650px){
  .offer-category-admin .home-category-admin-actions{grid-template-columns:1fr}
 }
+
+
+/* BAZOO preview catalog management and safe demo-only cleanup */
+.demo-manager-panel{
+ display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+ border:1px solid #e4d9f3;border-radius:16px;padding:17px 19px;margin:16px 0 22px;
+ background:linear-gradient(112deg,#faf7ff,#fff);box-shadow:0 6px 20px rgba(62,26,116,.035)
+}
+.demo-manager-copy{display:flex;align-items:center;gap:12px;flex:1;min-width:min(100%,270px)}
+.demo-manager-icon{
+ display:grid;place-items:center;flex:none;width:43px;height:43px;border-radius:13px;
+ background:#eee4fc;color:#6432a4
+}
+.demo-manager-icon svg{width:22px;height:22px}
+.demo-manager-copy strong{font-size:14px;font-weight:900;color:#32224b}
+.demo-manager-copy p{margin:5px 0 0;font-size:11.5px;line-height:1.75;color:#766987}
+.demo-manager-copy b{color:#602daf}
+.demo-manager-panel .demo-delete-button{
+ flex:none;max-width:100%;font-size:11.5px;line-height:1.5;
+ display:flex;align-items:center;justify-content:center;gap:7px;
+ padding:12px 15px;white-space:normal;text-align:center
+}
+.demo-manager-panel .demo-delete-button:disabled{opacity:.48;cursor:not-allowed}
+.demo-product-label{
+ display:inline-block!important;margin-inline-start:8px;
+ background:#f4eafd!important;border:1px solid #e1caf6!important;color:#7838a8!important;
+ font-size:10px!important;font-weight:900!important
+}
+@media(max-width:640px){
+ .demo-manager-panel{padding:13px;gap:12px;border-radius:13px}
+ .demo-manager-copy{align-items:flex-start}
+ .demo-manager-copy strong{font-size:13px}
+ .demo-manager-copy p{font-size:11px}
+ .demo-manager-panel .demo-delete-button{width:100%;font-size:11px}
+}
