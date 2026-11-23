@@ -13,7 +13,6 @@ let bootPromise=null;
 function glyph(name,cls="ui-icon"){return '<svg class="'+cls+'" aria-hidden="true"><use href="./icons.svg#'+name+'"></use></svg>'}
 const ICON_ACTION={edit:"settings",new:"plus",toggle:"eye",delete:"x",close:"x"};
 const HOME_CATEGORY_ORDER=["offers","phones","screens","tablets","devices-games","laptops","headphones","smart-watches","heaters","washing-machines","refrigerators","air-conditioners","cookers","cooking-appliances","vacuum-cleaners","perfumes"];
-const HOME_CATEGORY_LABELS={"devices-games":"الألعاب","refrigerators":"ثلاجات","air-conditioners":"السبلت","washing-machines":"الغسالات والمجففات"};
 
 const SUBTITLE={overview:"تابع أداء المتجر، واختصر وقت الإدارة من مساحة عمل واحدة.",products:"كل منتجات بازو وأسعارها ومخزونها في مكان واحد.",orders:"تابع كل طلب وغيّر حالة الطلب أو المنتج بسهولة.",shipping:"تحكّم في أجور التوصيل وتوفّر الخدمة لكل محافظة.",promos:"أنشئ لافتات جذابة ووحّد تجربة التسوّق.",categories:"رتّب أقسام المتجر وخصّص تجربة تصفّح المنتجات.",brands:"نظّم العلامات التجارية المتاحة في بازو.",members:"امنح فريقك الصلاحيات اللازمة بدون تعريض بيانات المتجر للخطر."};
 function alertUser(message,type="error"){
@@ -260,7 +259,7 @@ function homepageCategoryCard(item,rows){
    '<div class="home-category-admin-actions">'+picker+
    '<button class="category-edit-button" type="button" data-tab="promos">'+glyph("settings")+'الإعلانات</button></div></article>';
  }
- const title=HOME_CATEGORY_LABELS[item.slug]||item.name;
+ const title=item.name;
  const parent=categoryAncestors(item,rows).at(-1);
  return '<article class="home-category-admin-card" data-home-position="'+item.position+'" data-category-id="'+html(item.id)+'">'+
  '<div class="home-category-admin-image">'+categoryImageBlock(item)+'</div>'+
@@ -346,7 +345,7 @@ function categoryHomepageTiles(){
  const filtered=homepageCategoryRecords(rows).filter(item=>{
   if(state.categoryMissingOnly&&(item.isOffer?Boolean(state.records.offersCategoryCover):Boolean(item.image_url)))return false;
   if(!query)return true;
-  const names=[item.name,item.slug,HOME_CATEGORY_LABELS[item.slug],
+  const names=[item.name,item.slug,
    ...(item.isOffer?[]:categoryAncestors(item,rows).map(x=>x.name))];
   return names.some(x=>String(x||"").toLocaleLowerCase("ar").includes(query));
  });
@@ -593,6 +592,7 @@ async function saveOffersCategoryImage(input){
    .eq("key","offers_category_cover").single();
   if(verified.error||verified.data?.image_url!==url)throw Error("لم يتم تأكيد حفظ صورة العروض. يُرجى إعادة المحاولة.");
   state.records.offersCategoryCover=url;
+  announceCategoryChange();
   alertUser("تم رفع صورة «العروض المميزة» وحفظها بنجاح.","success");
   await reload();
   return url;
@@ -602,6 +602,10 @@ async function saveOffersCategoryImage(input){
   card?.classList?.remove("is-saving");
   input.value="";
  }
+}
+function announceCategoryChange(){
+ // Same-origin store tabs receive this signal and refresh their displayed titles/images.
+ try{window.localStorage?.setItem("bazoo_catalog_revision",String(Date.now()))}catch(error){}
 }
 async function saveCategoryImage(input){
  if(!can("categories"))throw Error("هذه الصلاحية غير مفعّلة لحسابك.");
@@ -622,6 +626,7 @@ async function saveCategoryImage(input){
   if(!url)throw Error("تعذّر قراءة الصورة المحددة.");
   // Save only the image: do not overwrite the category name, hierarchy or home visibility.
   await requestSave("categories",{image_url:url},id);
+  announceCategoryChange();
   alertUser("تم رفع صورة «"+category.name+"» وحفظها بنجاح.","success");
   await reload();
   return url;
@@ -656,6 +661,7 @@ async function saveTaxonomy(form){
   if(image)record.image_url=await upload(image,"product-images","categories",15360,650,650);
  }
  await requestSave(table,record,id);
+ if(table==="categories")announceCategoryChange();
  return table==="categories"?"تم حفظ التصنيف وربطه بالقسم الصحيح وظهوره في المتجر.":"تم حفظ العلامة التجارية والتحقق منها.";
 }
 async function savePromo(form){
