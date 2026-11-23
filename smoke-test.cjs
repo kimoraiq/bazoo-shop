@@ -63,10 +63,12 @@ const context={
 (async()=>{
  vm.runInNewContext(source,context,{timeout:10000});
  assert.match(node("#app").innerHTML,/merch-slider/,"homepage not rendered");
- assert.match(node("#app").innerHTML,/bazoo-cat-grid/,"branded category grid missing");
+ assert.match(node("#app").innerHTML,/bazoo-category-explorer/,"category explorer missing");
  assert.match(node("#app").innerHTML,/brand-gallery/,"brand gallery missing");
- assert.equal((node("#app").innerHTML.match(/class="bazoo-cat-tile"/g)||[]).length,6,"homepage must not show dozens of categories at once");
- assert.match(node("#app").innerHTML,/data-home-category-group="featured"/,"category tabs missing");
+ assert.match(source,/children\.slice\(0,6\)/,"homepage must limit displayed categories to six");
+ assert.match(source,/data-home-category-group/,"parent section tabs missing");
+ assert.match(source,/roots=state\.categories\.filter/,"tabs must be derived from database parent categories");
+ assert.doesNotMatch(source,/class="category-emoji"/,"no emoji should be used instead of real category photos");
  assert.match(node("#app").innerHTML,/data-home-category-more="1"/,"progressive category reveal missing");
  assert.match(html,/إلى جميع أنحاء العراق/,"correct nationwide delivery text missing");
  assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
