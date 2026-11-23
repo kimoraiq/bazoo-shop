@@ -31,6 +31,7 @@ jobs:
           node admin-panel-test.cjs
           node demo-preview-safety-test.cjs
           node category-hierarchy-test.cjs
+          node category-carousel-interaction-test.cjs
           node category-admin-consistency-test.cjs
           node catalog-dependent-filters-test.cjs
           node admin-brand-ui-test.cjs
