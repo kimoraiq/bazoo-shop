@@ -33,6 +33,10 @@ const factory=new Function("HOME_CATEGORY_ORDER",ancestors+"\n"+home+"\nreturn h
 const getHomepage=factory(adminOrder);
 const visible=getHomepage(rows);
 assert.equal(visible.length,24,"Homepage and admin must show all 23 categories plus the Offers tile");
+assert.match(app,/function homeCategoryCollection\(/,"storefront must pull all categories from live catalog");
+assert.match(app,/available\.filter\(c=>!pinned\.has\(c\.slug\)\)/,"storefront must show all categories beyond featured slots");
+assert.match(app,/remaining\.map\(\(item,i\)=>homeCategoryTile/,"all extra categories must render as clickable photo tiles");
+assert.match(app,/bazoo-category-extra-heading/,"the extra root and child section should be clearly labeled");
 assert.equal(visible.filter(x=>!x.isOffer).length,23,"Every category should be represented in the homepage");
 assert.equal(rows.length-visible.filter(x=>!x.isOffer).length,0,"No eligible category should be missing from the homepage");
 assert.equal(visible[0].slug,"offers");
