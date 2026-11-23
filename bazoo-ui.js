@@ -223,6 +223,7 @@
   function scan() {
     scheduled = false;
     document.querySelectorAll("select:not(.bz-native-select)").forEach(enhance);
+    document.querySelectorAll("select.bz-native-select").forEach(sync);
     if (opened && !opened.select.isConnected) close();
   }
   function scheduleScan() {
@@ -234,7 +235,7 @@
     if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) close();
   }, true);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && opened) { event.preventDefault(); close(true); }
+    if (event.key === "Escape" && opened) { event.preventDefault(); event.stopImmediatePropagation(); close(true); }
   }, true);
   document.addEventListener("change", (event) => {
     if (event.target?.matches?.("select")) sync(event.target);
@@ -244,7 +245,7 @@
   function initialize() {
     scan();
     const observer = new MutationObserver(scheduleScan);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialize, { once: true });
   else initialize();
