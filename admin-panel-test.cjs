@@ -47,7 +47,8 @@ function node(id){
  return elements.get(id);
 }
 const document={getElementById:node,addEventListener(){},body:{style:{}},createElement(){throw Error("Unexpected image creation")}};
-const window={addEventListener(){}};
+const categorySaveSignals=[];
+const window={addEventListener(){},localStorage:{setItem(key,value){categorySaveSignals.push([key,value])}}};
 const sessionStorage={getItem(){return null},setItem(){},removeItem(){}};
 class FormData{
  constructor(form){this.values=form.values||{}}
@@ -96,6 +97,7 @@ function form(values,type="productForm"){
  const category=form({id:"1",table:"categories",name:"الأجهزة الكهربائية",slug:"appliances",parent_id:"",sort_order:"0",active:"true"},"taxonomyForm");
  await admin.onSubmit({target:category,preventDefault(){},stopPropagation(){}});
  assert.equal(store.categories[0].name,"الأجهزة الكهربائية","category editing must persist");
+ assert.ok(categorySaveSignals.some(([key])=>key==="bazoo_catalog_revision"),"saving a category must signal other store tabs");
  assert.match(node("alert").textContent,/تم حفظ التصنيف/,"category editor must reach the database");
  assert.equal(node("alert").className,"alert success");
  // A parent category and its children must be grouped and each card should expose a direct upload.
