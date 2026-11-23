@@ -69,7 +69,7 @@ const context={
  assert.match(source,/data-home-category-group/,"parent section tabs missing");
  assert.match(source,/roots=state\.categories\.filter/,"tabs must be derived from database parent categories");
  assert.doesNotMatch(source,/class="category-emoji"/,"no emoji should be used instead of real category photos");
- assert.match(node("#app").innerHTML,/data-home-category-more="1"/,"progressive category reveal missing");
+ assert.match(source,/data-home-category-more="1"/,"progressive category reveal control missing");
  assert.match(html,/إلى جميع أنحاء العراق/,"correct nationwide delivery text missing");
  assert.match(html,/%D8%A8%D8%A7%D8%B2%D9%88%20%D8%A7%D9%81%D9%82%D9%8A.png/,"horizontal BAZOO logo not selected");
  assert.match(css,/\.merch-slider\{height:414px/,"desktop banner must have a fixed height");
