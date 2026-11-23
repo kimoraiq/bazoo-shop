@@ -8,7 +8,7 @@ const safeUrl=url=>/^https:\/\//i.test(String(url||""))?html(url):"";
 const SCOPE={overview:"لوحة التحكم",products:"المنتجات",orders:"الطلبات",shipping:"التوصيل",promos:"الإعلانات",categories:"الفئات",brands:"العلامات التجارية",members:"المسؤولون"};
 const ICON={overview:"home",products:"package",orders:"clipboard",shipping:"truck",promos:"sparkles",categories:"grid",brands:"tag",members:"user-round"};
 const STATUS={new:"جديد",confirmed:"تم التأكيد",packing:"قيد التجهيز",shipped:"قيد التوصيل",delivered:"تم التسليم",cancelled:"ملغي"};
-const state={user:null,role:null,permissions:{},tab:"products",records:{},busy:false,loading:false,adminVerified:false,draftKey:""};
+const state={user:null,role:null,permissions:{},tab:"products",records:{},busy:false,loading:false,adminVerified:false,draftKey:"",categorySearch:"",categoryMissingOnly:false};
 let bootPromise=null;
 function glyph(name,cls="ui-icon"){return '<svg class="'+cls+'" aria-hidden="true"><use href="./icons.svg#'+name+'"></use></svg>'}
 const ICON_ACTION={edit:"settings",new:"plus",toggle:"eye",delete:"x",close:"x"};
@@ -198,16 +198,94 @@ function categoryAncestors(category,list){
  return result;
 }
 function categoryPath(category,list){return [...categoryAncestors(category,list).map(c=>c.name),category.name].join(" / ")}
+function categoryImageBlock(category,isRoot=false){
+ const src=category.image_url&&safeUrl(category.image_url)?safeUrl(category.image_url):"";
+ return '<span class="category-image-box '+(isRoot?"category-image-root":"")+'">'+
+ (src?'<img src="'+src+'" alt="صورة '+html(category.name)+'" loading="lazy" decoding="async">':
+ '<span class="category-no-image">'+glyph("image")+'<small>بلا صورة</small></span>')+'</span>';
+}
+function categoryUploadControl(category){
+ return '<label class="category-upload-button" title="رفع أو تغيير صورة '+html(category.name)+'">'+
+ glyph("image")+'<span>'+(category.image_url?"تغيير الصورة":"رفع صورة")+'</span>'+
+ '<input type="file" class="category-photo-input" data-category-id="'+html(category.id)+'" accept="image/png,image/jpeg,image/webp" aria-label="رفع صورة '+html(category.name)+'">'+
+ '</label>';
+}
+function categoryCard(category,rows,isRoot=false){
+ const branch=categoryAncestors(category,rows);
+ const parent=branch[branch.length-1];
+ const groupName=isRoot?"قسم رئيسي":parent?"يتبع: "+parent.name:"فئة فرعية";
+ const hasImage=Boolean(category.image_url&&safeUrl(category.image_url));
+ return '<article class="category-manager-card '+(isRoot?"category-manager-root":"")+'" data-category-id="'+html(category.id)+'">'+
+ categoryImageBlock(category,isRoot)+
+ '<div class="category-manager-info"><div class="category-manager-name">'+html(category.name)+'</div>'+
+ '<div class="category-manager-meta">'+html(groupName)+'</div>'+
+ '<div class="category-manager-badges"><span class="category-mini-status '+(hasImage?"has-image":"missing-image")+'">'+(hasImage?"الصورة مرفوعة":"تحتاج صورة")+'</span>'+
+ (category.active?'<span class="category-mini-status">ظاهر</span>':'<span class="category-mini-status muted">مخفي</span>')+
+ (category.show_on_home?'<span class="category-mini-status">بالرئيسية</span>':'')+'</div></div>'+
+ '<div class="category-manager-actions">'+categoryUploadControl(category)+
+ '<button type="button" class="category-edit-button" data-action="edit" data-table="categories" data-id="'+html(category.id)+'">'+glyph("settings")+'تعديل</button>'+
+ '</div></article>';
+}
+function categorySortValue(category,rows){
+ const branch=[...categoryAncestors(category,rows),category];
+ return branch.map(x=>String(x.sort_order??0).padStart(5,"0")).join(".")+"."+String(category.name);
+}
+function categoryManagerGroups(){
+ const rows=state.records.categories||[];
+ const roots=rows.filter(c=>!c.parent_id||!rows.some(x=>String(x.id)===String(c.parent_id)))
+  .sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.name).localeCompare(String(b.name),"ar"));
+ const query=state.categorySearch.trim().toLocaleLowerCase("ar");
+ const missingOnly=state.categoryMissingOnly;
+ let count=0;
+ const groups=roots.map(root=>{
+  const descendants=rows.filter(c=>String(c.id)!==String(root.id)&&categoryAncestors(c,rows).some(x=>String(x.id)===String(root.id)));
+  descendants.sort((a,b)=>categorySortValue(a,rows).localeCompare(categorySortValue(b,rows),"ar"));
+  const rootMatches=!query||[root.name,root.slug].some(v=>String(v||"").toLocaleLowerCase("ar").includes(query));
+  const matched=descendants.filter(c=>
+   (!missingOnly||!c.image_url)&&
+   (rootMatches||[categoryPath(c,rows),c.slug].some(v=>String(v||"").toLocaleLowerCase("ar").includes(query)))
+  );
+  const rootMissing=missingOnly&&!root.image_url;
+  if((query&&!rootMatches&&!matched.length)||(missingOnly&&!rootMissing&&!matched.length))return "";
+  count+=matched.length+1;
+  const photoCount=descendants.filter(c=>Boolean(c.image_url)).length;
+  return '<section class="category-manager-group" data-parent-category="'+html(root.id)+'">'+
+  '<div class="category-group-head">'+categoryCard(root,rows,true)+
+  '<div class="category-group-toolbar"><span>'+descendants.length+' فئة تابعة • '+photoCount+' لديها صور</span>'+
+  '<button type="button" class="button mini secondary" data-action="new-category-child" data-id="'+html(root.id)+'">'+glyph("plus")+'إضافة فئة لهذا القسم</button></div></div>'+
+  '<div class="category-group-caption"><span>'+glyph("grid")+'الفئات التابعة لـ '+html(root.name)+'</span>'+
+  '<span>'+matched.length+' فئة ظاهرة</span></div>'+
+  (matched.length?'<div class="category-manager-grid">'+matched.map(c=>categoryCard(c,rows)).join("")+'</div>':
+  '<div class="category-group-empty">لا توجد فئات فرعية مطابقة هنا.</div>')+
+  '</section>';
+ }).filter(Boolean);
+ return groups.length?groups.join(""):'<div class="category-manager-empty">'+glyph("search")+'لا توجد فئات مطابقة للبحث أو التصفية.</div>';
+}
 function renderTaxonomy(tableName){
- const rows=state.records[tableName]||[],heading=SCOPE[tableName],isCat=tableName==="categories";
- const ordered=isCat?[...rows].sort((a,b)=>categoryPath(a,rows).localeCompare(categoryPath(b,rows),"ar")):rows;
- const headings=isCat?["الصورة","التصنيف","القسم الرئيسي","الرئيسية","الحالة","الإجراءات"]:["الاسم","المعرّف","الحالة","الإجراءات"];
- const body=ordered.map(p=>'<tr>'+(isCat?'<td>'+imageCell(p.image_url)+'</td>':"")+'<td><strong>'+html(p.name)+'</strong><div class="help">'+html(p.slug||"")+'</div></td>'
- +(isCat?'<td><span class="help">'+html(categoryAncestors(p,rows).map(x=>x.name).join(" / ")||"قسم رئيسي")+'</span></td><td><span class="tag '+(p.show_on_home?"":"off")+'">'+(p.show_on_home?"يظهر":"مخفي")+'</span></td>':"")
- +'<td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"ظاهر":"مخفي")+'</span></td><td><div class="cell-actions">'+action("edit",tableName,p.id,"تعديل")+action("toggle",tableName,p.id,p.active?"إخفاء":"إظهار")+action("delete",tableName,p.id,"حذف","danger")+'</div></td></tr>').join("");
- return '<div class="section-head"><div><h2>'+heading+'</h2><p>'+(isCat?"تصنيفات رئيسية وفرعية مترابطة مع صور الصفحة الرئيسية":"إضافة العلامات التجارية وتعديلها")+'</p></div><button type="button" class="button" data-action="new" data-table="'+tableName+'">'+glyph("plus")+'إضافة '+(tableName==="brands"?"علامة تجارية":"تصنيف")+'</button></div>'
- +(isCat?'<div class="notice-line">اضغط على «تعديل» لرفع صورة دائرية، وتحديد القسم الرئيسي، وتفعيل ظهوره في الصفحة الرئيسية. سينتقل الزائر مباشرة إلى منتجات التصنيف.</div>':"")
- +table(headings,body||'<tr><td colspan="'+headings.length+'">لا توجد عناصر بعد.</td></tr>');
+ if(tableName!=="categories"){
+  const rows=state.records[tableName]||[];
+  return '<div class="section-head"><div><h2>'+SCOPE[tableName]+'</h2><p>إضافة العلامات التجارية وتعديلها</p></div>'+
+  '<button type="button" class="button" data-action="new" data-table="brands">'+glyph("plus")+'إضافة علامة تجارية</button></div>'+
+  table(["الاسم","المعرّف","الحالة","الإجراءات"],rows.map(p=>
+   '<tr><td><strong>'+html(p.name)+'</strong></td><td>'+html(p.slug||"")+'</td><td><span class="tag '+(p.active?"":"off")+'">'+(p.active?"ظاهر":"مخفي")+'</span></td>'+
+   '<td><div class="cell-actions">'+action("edit","brands",p.id,"تعديل")+action("toggle","brands",p.id,p.active?"إخفاء":"إظهار")+action("delete","brands",p.id,"حذف","danger")+'</div></td></tr>').join("")||
+   '<tr><td colspan="4">لا توجد علامات تجارية.</td></tr>');
+ }
+ const rows=state.records.categories||[];
+ const missing=rows.filter(c=>!c.image_url).length;
+ const primary=rows.filter(c=>!c.parent_id).length;
+ return '<div class="category-manager">'+
+ '<div class="category-manager-intro"><div><h2>صور الفئات والأقسام</h2><p>كل قسم رئيسي وتحتَه فئاته. اضغط «رفع صورة» على الفئة المطلوبة، وسيتم حفظها مباشرة.</p></div>'+
+ '<button type="button" class="button" data-action="new" data-table="categories">'+glyph("plus")+'إضافة قسم أو فئة</button></div>'+
+ '<div class="category-manager-stats"><span>'+glyph("grid")+html(primary)+' أقسام رئيسية</span>'+
+ '<span>'+glyph("package")+html(rows.length)+' فئات وأقسام</span>'+
+ '<span class="'+(missing?"needs-photo":"")+'">'+glyph("image")+html(missing)+' بدون صور</span></div>'+
+ '<div class="category-manager-tools"><label class="category-search">'+glyph("search")+
+ '<input type="search" class="input" id="categoryManagerSearch" placeholder="ابحث باسم الفئة أو القسم..." autocomplete="off" value="'+html(state.categorySearch)+'" aria-label="البحث في الفئات"></label>'+
+ '<label class="category-filter-missing"><input id="categoryMissingOnly" type="checkbox" '+(state.categoryMissingOnly?"checked":"")+'><span>الفئات التي تحتاج صور فقط</span></label></div>'+
+ '<div class="category-manager-help">'+glyph("info")+
+ '<div><strong>مكان رفع الصور:</strong> تحت كل قسم ستجد الفئات التابعة له. اضغط <b>«رفع صورة»</b> أو <b>«تغيير الصورة»</b> على البطاقة نفسها واختر ملف PNG أو WEBP أو JPG. تُضغط الصورة تلقائياً إلى 15 كيلوبايت. <span>صور «العروض المميزة» تُدار من صفحة الإعلانات.</span></div></div>'+
+ '<div id="categoryManagerGroups">'+categoryManagerGroups()+'</div></div>';
 }
 function renderShipping(){
  const rows=state.records.shipping||[];
